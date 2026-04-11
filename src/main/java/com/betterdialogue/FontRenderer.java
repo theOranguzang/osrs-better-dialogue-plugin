@@ -40,6 +40,10 @@ public class FontRenderer
 	private int cachedSize = -1;
 	private String cachedPath = null;
 
+	// Separate cache for the option-dialogue font (smaller size)
+	private Font cachedOptionFont = null;
+	private int  cachedOptionSize = -1;
+
 	// -------------------------------------------------------------------------
 	// Font loading
 	// -------------------------------------------------------------------------
@@ -143,6 +147,48 @@ public class FontRenderer
 			g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING,
 				RenderingHints.VALUE_TEXT_ANTIALIAS_OFF);
 		}
+	}
+
+	/**
+	 * Returns a font at {@link BetterDialogueConfig#optionFontSize()} derived
+	 * from the same TTF as {@link #getFont()}.  Option rows are only 16 px tall
+	 * so this is intentionally smaller than the main dialogue font.
+	 */
+	public Font getOptionFont()
+	{
+		int size = config.optionFontSize();
+		// Invalidate if the base font changed (different TTF) or size changed
+		if (cachedOptionFont != null
+			&& size == cachedOptionSize
+			&& config.fontName() == cachedChoice
+			&& Objects.equals(config.customFontPath(), cachedPath))
+		{
+			return cachedOptionFont;
+		}
+		// Derive from the base font (loads / caches the TTF if not yet done)
+		cachedOptionFont = getFont().deriveFont(Font.PLAIN, (float) size);
+		cachedOptionSize = size;
+		return cachedOptionFont;
+	}
+
+	/**
+	 * Draws a single-line string centred horizontally within {@code bounds}
+	 * using an explicitly supplied {@code font} rather than the config default.
+	 *
+	 * @return the y coordinate of the bottom of the drawn line
+	 */
+	public int drawCenteredString(Graphics2D g, String text, Rectangle bounds, int y, Color color, Font font)
+	{
+		if (text == null || text.isEmpty())
+		{
+			return y;
+		}
+		g.setFont(font);
+		g.setColor(color);
+		FontMetrics fm = g.getFontMetrics(font);
+		int x = bounds.x + (bounds.width - fm.stringWidth(text)) / 2;
+		g.drawString(text, x, y + fm.getAscent());
+		return y + fm.getHeight();
 	}
 
 	/**

@@ -107,6 +107,18 @@ public interface BetterDialogueConfig extends Config
 		return Color.WHITE; // matches vanilla OSRS highlight behaviour
 	}
 
+	@ConfigItem(
+		keyName = "optionFontSize",
+		name = "Option Font Size",
+		description = "Point size for option menu text. Option rows are only 16 px tall — keep this at 13 or below to avoid overflow.",
+		position = 14
+	)
+	@Range(min = 8, max = 16)
+	default int optionFontSize()
+	{
+		return 13;
+	}
+
 	// -------------------------------------------------------------------------
 	// Per-type toggles
 	// -------------------------------------------------------------------------

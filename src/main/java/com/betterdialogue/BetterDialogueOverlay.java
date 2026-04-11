@@ -12,6 +12,8 @@ import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.awt.Color;
 import java.awt.Dimension;
+import java.awt.Font;
+import java.awt.FontMetrics;
 import java.awt.Graphics2D;
 import java.awt.Rectangle;
 import java.util.List;
@@ -181,17 +183,35 @@ public class BetterDialogueOverlay extends Overlay
 
 	private void renderOptionDialogue(Graphics2D g, DialogueState state)
 	{
+		Widget container = state.getTextWidget();
+		if (container == null || container.isHidden())
+		{
+			return;
+		}
+
+		// Fill the entire options container in one pass so there are no gaps
+		// between rows where the original 16 px bitmap text can peek through.
+		Rectangle containerBounds = container.getBounds();
+		if (containerBounds == null || containerBounds.width <= 0)
+		{
+			return;
+		}
+		fillBackground(g, containerBounds);
+
+		// Use the smaller option font — each row is only 16 px tall
+		Font optionFont = fontRenderer.getOptionFont();
+
 		// ---- Title ("Select an option") ----
-		Widget titleWidget = state.getTextWidget();
+		Widget titleWidget = state.getNameWidget();
 		if (titleWidget != null && !titleWidget.isHidden())
 		{
 			Rectangle titleBounds = titleWidget.getBounds();
 			if (titleBounds != null && titleBounds.width > 0)
 			{
-				fillBackground(g, titleBounds);
-				// Title colour confirmed by Widget Inspector: TextColor = 0x800000 (dark red)
 				fontRenderer.drawCenteredString(
-					g, state.getNpcName(), titleBounds, titleBounds.y + V_PADDING, OPTION_TITLE_COLOR);
+					g, state.getNpcName(), titleBounds,
+					centreY(g, titleBounds, optionFont),
+					OPTION_TITLE_COLOR, optionFont);
 			}
 		}
 
@@ -220,15 +240,25 @@ public class BetterDialogueOverlay extends Overlay
 				continue;
 			}
 
-			fillBackground(g, optBounds);
-
 			boolean hovered = mouse != null
 				&& optBounds.contains(mouse.getX(), mouse.getY());
-			// Use the configurable hover colour (defaults to white, matching vanilla)
 			Color textColor = hovered ? config.optionHoverColor() : config.fontColor();
 
-			fontRenderer.drawCenteredString(g, options.get(i), optBounds, optBounds.y + V_PADDING, textColor);
+			fontRenderer.drawCenteredString(
+				g, options.get(i), optBounds,
+				centreY(g, optBounds, optionFont),
+				textColor, optionFont);
 		}
+	}
+
+	/**
+	 * Computes the top-of-line y coordinate that vertically centres text
+	 * (at the given font) within {@code bounds}.
+	 */
+	private static int centreY(Graphics2D g, Rectangle bounds, Font font)
+	{
+		FontMetrics fm = g.getFontMetrics(font);
+		return bounds.y + (bounds.height - fm.getHeight()) / 2;
 	}
 
 	private void renderSpriteDialogue(Graphics2D g, DialogueState state)
