@@ -1,54 +1,64 @@
-# Better Dialogue — RuneLite Plugin
+# Better Dialogue
 
-Replaces the hard-to-read OSRS bitmap cursive font (Quill 8 / "Freehand") with a
-clean, configurable TrueType font rendered via Java2D overlays.
+A RuneLite plugin that replaces the hard-to-read OSRS dialogue font with a clean, configurable system font.
 
-## Features
+## Before / After
 
-- Replaces text in **NPC dialogue**, **player dialogue**, **option menus**, and **item/action sprite dialogue**
-- Per-type enable/disable toggles in the config panel
-- Font picker: Roboto, Inter, Open Sans, Lato, Source Sans 3, or a custom `.ttf` path
-- Configurable font size (10–28 pt), body/name/continue-prompt colours
-- Optional sub-pixel anti-aliasing
-- Original widget text is restored on plugin shutdown — nothing is permanently altered
+<!-- USER: Add before/after screenshot images here -->
+
+## What it does
+
+Replaces the bitmap "Quill 8" cursive font in dialogue boxes with a readable font rendered via overlay. Covers:
+
+- **NPC dialogue** — the main conversation box
+- **Player dialogue** — your character's responses
+- **Option menus** — "Select an option" multi-choice
+- **Item/action dialogue** — "You light the logs", drop warnings, etc.
+
+Everything else (chatbox, overhead text, menus) is unchanged.
+
+## Configuration
+
+| Setting | Description | Default |
+|---|---|---|
+| Font | SansSerif, Serif, Monospaced, Dialog, Dialog Input | SansSerif |
+| Font Size | 10–24px | 14 |
+| Bold | Bold weight toggle | Off |
+| Anti-aliasing | Smooth font edges | On |
+| NPC Dialogue | Enable/disable per type | On |
+| Player Dialogue | Enable/disable per type | On |
+| Option Menus | Enable/disable per type | On |
+| Item/Action Dialogue | Enable/disable per type | On |
+
+Fonts are Java logical font names — they map to system defaults on every OS (Arial on Windows, Helvetica on Mac, DejaVu on Linux). No bundled font files, no missing font errors.
 
 ## How it works
 
-The game renders dialogue through the Widget system using a fixed bitmap font.
-Because RuneLite's `Widget.setText()` cannot change the font, this plugin:
+The game renders dialogue text through widgets using a fixed bitmap font. RuneLite's Widget API can change text content but not the font, so this plugin:
 
-1. **Detects** which dialogue widget is currently visible (checked every game tick)
-2. **Blanks** the original text child widget (`widget.setText("")`)
-3. **Paints** replacement text with a `Graphics2D` overlay on `OverlayLayer.ABOVE_WIDGETS`
+1. Detects visible dialogue widgets each tick
+2. Caches the text content
+3. Blanks the original widget text
+4. Paints replacement text via a `Graphics2D` overlay positioned over the dialogue box
 
-Click-to-continue and option selection are unaffected — the click target is the
-widget bounds, not its rendered text.
+Click-to-continue and option selection work normally — click targets are widget bounds, not rendered text. Original text is restored on plugin shutdown.
 
-## Widget child indices
+## Installation
 
-The indices below are approximate; **verify with the in-game Widget Inspector**
-and adjust in `DialogueWidgetManager` if they differ after a game update.
+Available on the [RuneLite Plugin Hub](https://runelite.net/plugin-hub/). Search for "Better Dialogue" in the Plugin Hub within RuneLite.
 
-| Dialogue type     | InterfaceID constant  | Name | Text | Continue |
-|-------------------|-----------------------|------|------|----------|
-| NPC dialogue      | `DIALOG_NPC` (231)    | 4    | 6    | 5        |
-| Player dialogue   | `DIALOG_PLAYER` (217) | 4    | 6    | 5        |
-| Option menu       | `DIALOG_OPTION` (219) | 1    | 2–6  | —        |
-| Sprite/item       | `DIALOG_SPRITE` (193) | —    | 2    | 3        |
-
-## Bundled fonts
-
-Drop `.ttf` files into `src/main/resources/fonts/` matching the names expected
-by `FontChoice` (e.g. `Roboto-Regular.ttf`).  Free downloads from
-[Google Fonts](https://fonts.google.com).  Without them the plugin falls back
-to the JVM's built-in `SansSerif` family.
-
-## Development setup
-
-```
-./gradlew run          # launch RuneLite with the plugin loaded
-./gradlew build        # compile + test
-./gradlew shadowJar    # build a fat JAR
-```
+## Building from source
 
 Requires JDK 11+.
+
+```
+./gradlew build
+```
+
+## Acknowledgments
+
+Inspired by [RuneLite issue #11729](https://github.com/runelite/runelite/issues/11729) — an accessibility feature request open since 2020.
+
+## License
+
+BSD 2-Clause
