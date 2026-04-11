@@ -45,6 +45,12 @@ public class BetterDialogueOverlay extends Overlay
 	 */
 	private static final Color DIALOGUE_BG = new Color(0xC9, 0xB8, 0x9A, 255);
 
+	/**
+	 * Colour of the "Select an option" title in the option dialogue.
+	 * Confirmed via Widget Inspector: TextColor = 0x800000 (dark red).
+	 */
+	private static final Color OPTION_TITLE_COLOR = new Color(0x80, 0x00, 0x00);
+
 	/** Vertical padding between the widget top and the first text baseline. */
 	private static final int V_PADDING = 4;
 
@@ -183,9 +189,9 @@ public class BetterDialogueOverlay extends Overlay
 			if (titleBounds != null && titleBounds.width > 0)
 			{
 				fillBackground(g, titleBounds);
-				// Title uses the body text colour; it is centre-aligned like the options
+				// Title colour confirmed by Widget Inspector: TextColor = 0x800000 (dark red)
 				fontRenderer.drawCenteredString(
-					g, state.getNpcName(), titleBounds, titleBounds.y + V_PADDING, config.fontColor());
+					g, state.getNpcName(), titleBounds, titleBounds.y + V_PADDING, OPTION_TITLE_COLOR);
 			}
 		}
 

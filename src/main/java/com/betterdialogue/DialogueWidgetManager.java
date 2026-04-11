@@ -62,9 +62,11 @@ public class DialogueWidgetManager
 	private static final int PLAYER_CHILD_TEXT     = 6;
 	private static final int PLAYER_CHILD_CONTINUE = 5;
 
-	private static final int OPTION_CHILD_TITLE = 1;
-	private static final int OPTION_CHILD_FIRST = 2;
-	private static final int OPTION_COUNT       = 5;
+	// Option dialogue (InterfaceID.DIALOG_OPTION)
+	// Container: static child 1.  Title and options are dynamic children of that container.
+	//   Dynamic[0] = title "Select an option" (HasListener=false, color=0x800000)
+	//   Dynamic[1..n] = clickable option rows  (HasListener=true)
+	// NOTE: there are NO useful static child constants here — access is via getDynamicChildren().
 
 	private static final int SPRITE_CHILD_TEXT     = 2;
 	private static final int SPRITE_CHILD_CONTINUE = 3;
@@ -108,17 +110,17 @@ public class DialogueWidgetManager
 	private List<String> cachedOptionTexts   = Collections.emptyList();
 	private Widget[]     cachedOptionWidgets = new Widget[0];
 	private String       cachedOptionTitle   = "";
+	/**
+	 * Stable reference to the title dynamic child widget (dynamic index 0 of the
+	 * options container).  Preserved across frames so {@link BetterDialogueOverlay}
+	 * can re-blank it in {@code reBlankWidgets()} even on frames where the text
+	 * is already "".
+	 */
+	private Widget       cachedOptionTitleWidget = null;
 
 	/** Which dialogue type was active on the previous call to {@link #getCurrentDialogue()}. */
 	private DialogueType lastSeenType = null;
 
-	/**
-	 * One-shot flag: dump option widget tree to the log the first time the
-	 * option dialogue is detected.  Reset when the dialogue closes so the dump
-	 * fires again if the player opens another option menu later.
-	 * Set to {@code false} to re-enable the dump at any time.
-	 */
-	private boolean optionDebugDumped = false;
 
 	// -------------------------------------------------------------------------
 	// Public API
@@ -190,10 +192,11 @@ public class DialogueWidgetManager
 			return buildPlayerState();
 		}
 
-		Widget optionRoot = client.getWidget(InterfaceID.DIALOG_OPTION, 0);
-		if (isVisible(optionRoot))
+		// Options container lives at DIALOG_OPTION static child 1 (confirmed via Widget Inspector).
+		// Its dynamic children hold the title [0] and clickable options [1..n].
+		Widget optionContainer = client.getWidget(InterfaceID.DIALOG_OPTION, 1);
+		if (isVisible(optionContainer))
 		{
-			debugDumpOptionWidget(optionRoot);
 			return buildOptionState();
 		}
 
@@ -286,35 +289,46 @@ public class DialogueWidgetManager
 
 	private DialogueState buildOptionState()
 	{
-		Widget titleWidget = client.getWidget(InterfaceID.DIALOG_OPTION, OPTION_CHILD_TITLE);
-
-		// ---- Capture + blank the title independently ----
-		// The title ("Select an option") is a separate widget from the choices.
-		// It needs its own capture-then-blank cycle so it never flashes in Quill font.
-		if (titleWidget != null)
+		// The options container is DIALOG_OPTION static child 1.
+		// All text lives in its dynamic children:
+		//   [0]     = title "Select an option"  (HasListener=false, color=0x800000)
+		//   [1..n]  = clickable options          (HasListener=true)
+		// Unused option slots are hidden or have empty text — always skip them.
+		Widget container = client.getWidget(InterfaceID.DIALOG_OPTION, 1);
+		if (container == null)
 		{
-			String titleRaw = titleWidget.getText();
-			if (titleRaw != null && !titleRaw.isEmpty())
-			{
-				cachedOptionTitle = stripTags(titleRaw);
-			}
-			blankWidget(titleWidget);
+			return null;
 		}
 
-		// ---- Capture + blank each option child ----
-		// Always collect live widget refs (needed for bounds in the overlay).
-		// Only refresh the text cache when option widgets have non-empty text.
+		Widget[] dynChildren = container.getDynamicChildren();
+		if (dynChildren == null || dynChildren.length == 0)
+		{
+			return null;
+		}
+
+		// ---- Capture + blank the title (dynamic child 0) ----
+		Widget titleWidget = dynChildren[0];
+		cachedOptionTitleWidget = titleWidget; // preserve ref for reBlankWidgets()
+		String titleRaw = titleWidget.getText();
+		if (titleRaw != null && !titleRaw.isEmpty())
+		{
+			cachedOptionTitle = stripTags(titleRaw);
+		}
+		blankWidget(titleWidget);
+
+		// ---- Capture + blank each option (dynamic children 1..n) ----
 		List<String> freshTexts  = new ArrayList<>();
 		List<Widget> liveWidgets = new ArrayList<>();
 
-		for (int i = 0; i < OPTION_COUNT; i++)
+		for (int i = 1; i < dynChildren.length; i++)
 		{
-			Widget opt = client.getWidget(InterfaceID.DIALOG_OPTION, OPTION_CHILD_FIRST + i);
+			Widget opt = dynChildren[i];
 			if (opt == null || opt.isHidden())
 			{
 				continue;
 			}
 
+			// Always collect as a live widget so the overlay has current bounds
 			liveWidgets.add(opt);
 
 			String optText = opt.getText();
@@ -328,14 +342,13 @@ public class DialogueWidgetManager
 
 		if (!freshTexts.isEmpty())
 		{
-			// New real text arrived — update both text and widget caches atomically
+			// New real text arrived — update text and widget caches atomically
 			cachedOptionTexts   = freshTexts;
 			cachedOptionWidgets = liveWidgets.toArray(new Widget[0]);
 		}
 		else if (!liveWidgets.isEmpty())
 		{
-			// Widgets visible but already blank (we blanked them last frame).
-			// Update widget refs only so the overlay has current bounds.
+			// Options already blank (we blanked them last frame) — update bounds refs only
 			cachedOptionWidgets = liveWidgets.toArray(new Widget[0]);
 		}
 
@@ -349,10 +362,10 @@ public class DialogueWidgetManager
 			cachedOptionTitle,
 			null,
 			cachedOptionTexts,
-			titleWidget,
+			container,               // textWidget — used for bounds & visibility checks
+			cachedOptionTitleWidget, // nameWidget — re-blanked by reBlankWidgets()
 			null,
-			null,
-			cachedOptionWidgets
+			cachedOptionWidgets      // option dynamic children
 		);
 	}
 
@@ -412,10 +425,10 @@ public class DialogueWidgetManager
 				cachedPlayerName = "";
 				break;
 			case OPTION_DIALOGUE:
-				cachedOptionTexts   = Collections.emptyList();
-				cachedOptionWidgets = new Widget[0];
-				cachedOptionTitle   = "";
-				optionDebugDumped   = false; // allow re-dump next time options open
+				cachedOptionTexts       = Collections.emptyList();
+				cachedOptionWidgets     = new Widget[0];
+				cachedOptionTitle       = "";
+				cachedOptionTitleWidget = null;
 				break;
 			case SPRITE_DIALOGUE:
 				cachedSpriteBody = Collections.emptyList();
@@ -429,94 +442,6 @@ public class DialogueWidgetManager
 	// Widget blanking
 	// -------------------------------------------------------------------------
 
-	/**
-	 * One-shot diagnostic dump: logs the full child tree of the option dialogue
-	 * root widget so the correct child indices / child type can be determined
-	 * without guessing.  Fires once per option-dialogue session (resets on close).
-	 *
-	 * <p>Look for lines like:
-	 * <pre>
-	 *   [OPTION debug] static  child 0: id=... text='Select an Option' hidden=false
-	 *   [OPTION debug] dynamic child 3: id=... text='I'd like to access my bank' hidden=false
-	 * </pre>
-	 * That tells you <em>which child type</em> (static vs dynamic) and <em>which
-	 * index</em> to use in {@link #buildOptionState()}.
-	 */
-	private void debugDumpOptionWidget(Widget root)
-	{
-		if (optionDebugDumped)
-		{
-			return;
-		}
-		optionDebugDumped = true;
-
-		log.info("[OPTION debug] root={} hidden={} id={}",
-			root, root.isHidden(), root.getId());
-
-		// -- Static children (accessed via client.getWidget(group, childIdx)) --
-		Widget[] staticKids = root.getStaticChildren();
-		if (staticKids != null)
-		{
-			log.info("[OPTION debug] {} static children:", staticKids.length);
-			for (int i = 0; i < staticKids.length; i++)
-			{
-				Widget w = staticKids[i];
-				log.info("  [OPTION debug] static  child {:2d}: id={} text='{}' hidden={}",
-					i, w.getId(), w.getText(), w.isHidden());
-			}
-		}
-		else
-		{
-			log.info("[OPTION debug] static children: null");
-		}
-
-		// -- Dynamic children (list-item style children populated at runtime) --
-		Widget[] dynKids = root.getDynamicChildren();
-		if (dynKids != null)
-		{
-			log.info("[OPTION debug] {} dynamic children:", dynKids.length);
-			for (int i = 0; i < dynKids.length; i++)
-			{
-				Widget w = dynKids[i];
-				log.info("  [OPTION debug] dynamic child {:2d}: id={} text='{}' hidden={}",
-					i, w.getId(), w.getText(), w.isHidden());
-			}
-		}
-		else
-		{
-			log.info("[OPTION debug] dynamic children: null");
-		}
-
-		// -- Nested children --
-		Widget[] nestedKids = root.getNestedChildren();
-		if (nestedKids != null)
-		{
-			log.info("[OPTION debug] {} nested children:", nestedKids.length);
-			for (int i = 0; i < nestedKids.length; i++)
-			{
-				Widget w = nestedKids[i];
-				log.info("  [OPTION debug] nested  child {:2d}: id={} text='{}' hidden={}",
-					i, w.getId(), w.getText(), w.isHidden());
-			}
-		}
-		else
-		{
-			log.info("[OPTION debug] nested children: null");
-		}
-
-		// -- Flat index walk via client.getWidget(group, i) for i = 0..15 --
-		// This confirms which indices are accessible as top-level children.
-		log.info("[OPTION debug] flat getWidget({}, i) walk:", InterfaceID.DIALOG_OPTION);
-		for (int i = 0; i <= 15; i++)
-		{
-			Widget w = client.getWidget(InterfaceID.DIALOG_OPTION, i);
-			if (w != null)
-			{
-				log.info("  [OPTION debug] getWidget({},{:2d}): text='{}' hidden={}",
-					InterfaceID.DIALOG_OPTION, i, w.getText(), w.isHidden());
-			}
-		}
-	}
 
 	/**
 	 * Saves a widget's original text (for shutdown restoration) then blanks it.
