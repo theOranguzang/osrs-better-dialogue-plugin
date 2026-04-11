@@ -175,6 +175,21 @@ public class BetterDialogueOverlay extends Overlay
 
 	private void renderOptionDialogue(Graphics2D g, DialogueState state)
 	{
+		// ---- Title ("Select an option") ----
+		Widget titleWidget = state.getTextWidget();
+		if (titleWidget != null && !titleWidget.isHidden())
+		{
+			Rectangle titleBounds = titleWidget.getBounds();
+			if (titleBounds != null && titleBounds.width > 0)
+			{
+				fillBackground(g, titleBounds);
+				// Title uses the body text colour; it is centre-aligned like the options
+				fontRenderer.drawCenteredString(
+					g, state.getNpcName(), titleBounds, titleBounds.y + V_PADDING, config.fontColor());
+			}
+		}
+
+		// ---- Option rows ----
 		Widget[] optionWidgets = state.getOptionWidgets();
 		List<String> options = state.getOptions();
 
@@ -203,7 +218,8 @@ public class BetterDialogueOverlay extends Overlay
 
 			boolean hovered = mouse != null
 				&& optBounds.contains(mouse.getX(), mouse.getY());
-			Color textColor = hovered ? Color.WHITE : config.fontColor();
+			// Use the configurable hover colour (defaults to white, matching vanilla)
+			Color textColor = hovered ? config.optionHoverColor() : config.fontColor();
 
 			fontRenderer.drawCenteredString(g, options.get(i), optBounds, optBounds.y + V_PADDING, textColor);
 		}

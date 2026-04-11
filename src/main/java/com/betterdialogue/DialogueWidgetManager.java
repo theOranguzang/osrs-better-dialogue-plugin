@@ -279,10 +279,24 @@ public class DialogueWidgetManager
 	{
 		Widget titleWidget = client.getWidget(InterfaceID.DIALOG_OPTION, OPTION_CHILD_TITLE);
 
+		// ---- Capture + blank the title independently ----
+		// The title ("Select an option") is a separate widget from the choices.
+		// It needs its own capture-then-blank cycle so it never flashes in Quill font.
+		if (titleWidget != null)
+		{
+			String titleRaw = titleWidget.getText();
+			if (titleRaw != null && !titleRaw.isEmpty())
+			{
+				cachedOptionTitle = stripTags(titleRaw);
+			}
+			blankWidget(titleWidget);
+		}
+
+		// ---- Capture + blank each option child ----
 		// Always collect live widget refs (needed for bounds in the overlay).
 		// Only refresh the text cache when option widgets have non-empty text.
-		List<String>  freshTexts   = new ArrayList<>();
-		List<Widget>  liveWidgets  = new ArrayList<>();
+		List<String> freshTexts  = new ArrayList<>();
+		List<Widget> liveWidgets = new ArrayList<>();
 
 		for (int i = 0; i < OPTION_COUNT; i++)
 		{
@@ -308,11 +322,10 @@ public class DialogueWidgetManager
 			// New real text arrived — update both text and widget caches atomically
 			cachedOptionTexts   = freshTexts;
 			cachedOptionWidgets = liveWidgets.toArray(new Widget[0]);
-			cachedOptionTitle   = titleWidget != null ? stripTags(titleWidget.getText()) : "Select an Option";
 		}
 		else if (!liveWidgets.isEmpty())
 		{
-			// Widgets are visible but already blank (we blanked them last frame).
+			// Widgets visible but already blank (we blanked them last frame).
 			// Update widget refs only so the overlay has current bounds.
 			cachedOptionWidgets = liveWidgets.toArray(new Widget[0]);
 		}

@@ -96,6 +96,17 @@ public interface BetterDialogueConfig extends Config
 		return new Color(0x00008B); // dark blue
 	}
 
+	@ConfigItem(
+		keyName = "optionHoverColor",
+		name = "Option Hover Color",
+		description = "Text colour when the mouse hovers over a dialogue option",
+		position = 13
+	)
+	default Color optionHoverColor()
+	{
+		return Color.WHITE; // matches vanilla OSRS highlight behaviour
+	}
+
 	// -------------------------------------------------------------------------
 	// Per-type toggles
 	// -------------------------------------------------------------------------
