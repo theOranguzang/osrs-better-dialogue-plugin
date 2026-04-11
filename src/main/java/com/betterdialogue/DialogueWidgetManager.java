@@ -84,6 +84,9 @@ public class DialogueWidgetManager
 	@Inject
 	private Client client;
 
+	@Inject
+	private BetterDialogueConfig config;
+
 	// -------------------------------------------------------------------------
 	// Original-text store (for shutdown restoration)
 	// -------------------------------------------------------------------------
@@ -181,13 +184,13 @@ public class DialogueWidgetManager
 	private DialogueState detectAndBuild()
 	{
 		Widget npcRoot = client.getWidget(InterfaceID.DIALOG_NPC, 0);
-		if (isVisible(npcRoot))
+		if (isVisible(npcRoot) && config.replaceNpc())
 		{
 			return buildNpcState();
 		}
 
 		Widget playerRoot = client.getWidget(InterfaceID.DIALOG_PLAYER, 0);
-		if (isVisible(playerRoot))
+		if (isVisible(playerRoot) && config.replacePlayer())
 		{
 			return buildPlayerState();
 		}
@@ -195,13 +198,13 @@ public class DialogueWidgetManager
 		// Options container lives at DIALOG_OPTION static child 1 (confirmed via Widget Inspector).
 		// Its dynamic children hold the title [0] and clickable options [1..n].
 		Widget optionContainer = client.getWidget(InterfaceID.DIALOG_OPTION, 1);
-		if (isVisible(optionContainer))
+		if (isVisible(optionContainer) && config.replaceOptions())
 		{
 			return buildOptionState();
 		}
 
 		Widget spriteRoot = client.getWidget(InterfaceID.DIALOG_SPRITE, 0);
-		if (isVisible(spriteRoot))
+		if (isVisible(spriteRoot) && config.replaceSprite())
 		{
 			return buildSpriteState();
 		}

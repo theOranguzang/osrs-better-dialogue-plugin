@@ -107,14 +107,14 @@ public class BetterDialogueOverlay extends Overlay
 		switch (state.getType())
 		{
 			case NPC_DIALOGUE:
-				if (config.replaceNpcDialogue())
+				if (config.replaceNpc())
 				{
 					renderNpcDialogue(graphics, state);
 				}
 				break;
 
 			case PLAYER_DIALOGUE:
-				if (config.replacePlayerDialogue())
+				if (config.replacePlayer())
 				{
 					renderPlayerDialogue(graphics, state);
 				}
@@ -128,7 +128,7 @@ public class BetterDialogueOverlay extends Overlay
 				break;
 
 			case SPRITE_DIALOGUE:
-				if (config.replaceSpriteDialogue())
+				if (config.replaceSprite())
 				{
 					renderSpriteDialogue(graphics, state);
 				}
@@ -242,7 +242,7 @@ public class BetterDialogueOverlay extends Overlay
 
 			boolean hovered = mouse != null
 				&& optBounds.contains(mouse.getX(), mouse.getY());
-			Color textColor = hovered ? config.optionHoverColor() : config.fontColor();
+			Color textColor = hovered ? Color.WHITE : Color.BLACK;
 
 			fontRenderer.drawCenteredString(
 				g, options.get(i), optBounds,

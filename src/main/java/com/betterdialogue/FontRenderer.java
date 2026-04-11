@@ -10,22 +10,21 @@ import java.awt.Graphics2D;
 import java.awt.Color;
 import java.awt.Rectangle;
 import java.awt.RenderingHints;
-import java.io.File;
-import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Objects;
 
 /**
- * Loads and caches TrueType fonts, and provides word-wrap / centred-text
- * drawing utilities used by {@link BetterDialogueOverlay}.
+ * Provides font creation, caching, rendering-hint application, and word-wrap /
+ * centred-text drawing utilities used by {@link BetterDialogueOverlay}.
  *
- * <h3>Font resolution order</h3>
- * <ol>
- *   <li>Custom file path (when {@link FontChoice#CUSTOM} is selected)</li>
- *   <li>Bundled TTF resource from {@code src/main/resources/fonts/}</li>
- *   <li>JVM fallback: {@link Font#SANS_SERIF}</li>
- * </ol>
+ * <p>Fonts are created from Java logical font names (SansSerif, Serif, etc.)
+ * which are always available on every OS with no bundled TTF files required.
+ * The derived {@link Font} object is cached and only rebuilt when the config
+ * changes (font family, size, or bold flag).
+ *
+ * <h3>Statelessness contract</h3>
+ * The only mutable state is the font cache.  All layout information (bounds,
+ * segments) is passed in per call and is never stored on the instance.
  */
 @Slf4j
 @Singleton
@@ -34,92 +33,45 @@ public class FontRenderer
 	@Inject
 	private BetterDialogueConfig config;
 
-	// Cached derived font — invalidated whenever config changes
-	private Font cachedFont = null;
-	private FontChoice cachedChoice = null;
-	private int cachedSize = -1;
-	private String cachedPath = null;
-
-	// Separate cache for the option-dialogue font (smaller size)
-	private Font cachedOptionFont = null;
-	private int  cachedOptionSize = -1;
-
 	// -------------------------------------------------------------------------
-	// Font loading
+	// Font cache — invalidated when any config key that affects the font changes
 	// -------------------------------------------------------------------------
 
-	/** Returns the currently configured {@link Font}, creating it if necessary. */
+	private Font   cachedFont    = null;
+	private String lastFontKey   = null;
+
+	// -------------------------------------------------------------------------
+	// Font access
+	// -------------------------------------------------------------------------
+
+	/**
+	 * Returns the currently configured {@link Font}, rebuilding it only when
+	 * the font family, size, or bold flag has changed since the last call.
+	 */
 	public Font getFont()
 	{
-		FontChoice choice = config.fontName();
-		int size = config.fontSize();
-		String customPath = config.customFontPath();
+		String key = config.fontFamily().getJavaName()
+			+ "_" + config.fontSize()
+			+ "_" + config.boldText();
 
-		if (cachedFont != null
-			&& choice == cachedChoice
-			&& size == cachedSize
-			&& Objects.equals(customPath, cachedPath))
+		if (!key.equals(lastFontKey))
 		{
-			return cachedFont;
+			int style = config.boldText() ? Font.BOLD : Font.PLAIN;
+			cachedFont  = new Font(config.fontFamily().getJavaName(), style, config.fontSize());
+			lastFontKey = key;
+			log.debug("Font rebuilt: {}", key);
 		}
-
-		cachedChoice = choice;
-		cachedSize = size;
-		cachedPath = customPath;
-
-		Font font = null;
-
-		if (choice == FontChoice.CUSTOM && customPath != null && !customPath.isEmpty())
-		{
-			font = loadFontFromFile(customPath, size);
-		}
-
-		if (font == null && choice != FontChoice.CUSTOM && choice.getResourcePath() != null)
-		{
-			font = loadFontFromResource(choice.getResourcePath(), size);
-		}
-
-		if (font == null)
-		{
-			log.debug("Falling back to JVM SANS_SERIF font at size {}", size);
-			font = new Font(Font.SANS_SERIF, Font.PLAIN, size);
-		}
-
-		cachedFont = font;
 		return cachedFont;
 	}
 
-	private Font loadFontFromResource(String resourcePath, int size)
+	/**
+	 * Returns the font used for option-dialogue rows.
+	 * Option rows share the same configured font as body text — "one font for
+	 * everything" keeps the config panel simple.
+	 */
+	public Font getOptionFont()
 	{
-		try (InputStream is = FontRenderer.class.getResourceAsStream("/" + resourcePath))
-		{
-			if (is == null)
-			{
-				log.debug("Bundled font resource not found: {}", resourcePath);
-				return null;
-			}
-			Font base = Font.createFont(Font.TRUETYPE_FONT, is);
-			return base.deriveFont(Font.PLAIN, (float) size);
-		}
-		catch (Exception e)
-		{
-			log.warn("Failed to load bundled font '{}': {}", resourcePath, e.getMessage());
-			return null;
-		}
-	}
-
-	private Font loadFontFromFile(String path, int size)
-	{
-		try
-		{
-			Font base = Font.createFont(Font.TRUETYPE_FONT, new File(path));
-			return base.deriveFont(Font.PLAIN, (float) size);
-		}
-		catch (Exception e)
-		{
-			log.warn("Failed to load custom font '{}': {}", path, e.getMessage());
-			return null;
-		}
+		return getFont();
 	}
 
 	// -------------------------------------------------------------------------
@@ -127,8 +79,8 @@ public class FontRenderer
 	// -------------------------------------------------------------------------
 
 	/**
-	 * Applies (or removes) anti-aliasing rendering hints based on the current
-	 * config. Call this once per {@link BetterDialogueOverlay#render} frame
+	 * Applies (or removes) text anti-aliasing rendering hints based on the
+	 * current config.  Call once per {@link BetterDialogueOverlay#render} frame
 	 * before drawing any text.
 	 */
 	public void applyRenderingHints(Graphics2D g)
@@ -150,30 +102,8 @@ public class FontRenderer
 	}
 
 	/**
-	 * Returns a font at {@link BetterDialogueConfig#optionFontSize()} derived
-	 * from the same TTF as {@link #getFont()}.  Option rows are only 16 px tall
-	 * so this is intentionally smaller than the main dialogue font.
-	 */
-	public Font getOptionFont()
-	{
-		int size = config.optionFontSize();
-		// Invalidate if the base font changed (different TTF) or size changed
-		if (cachedOptionFont != null
-			&& size == cachedOptionSize
-			&& config.fontName() == cachedChoice
-			&& Objects.equals(config.customFontPath(), cachedPath))
-		{
-			return cachedOptionFont;
-		}
-		// Derive from the base font (loads / caches the TTF if not yet done)
-		cachedOptionFont = getFont().deriveFont(Font.PLAIN, (float) size);
-		cachedOptionSize = size;
-		return cachedOptionFont;
-	}
-
-	/**
 	 * Draws a single-line string centred horizontally within {@code bounds}
-	 * using an explicitly supplied {@code font} rather than the config default.
+	 * using an explicitly supplied {@code font}.
 	 *
 	 * @return the y coordinate of the bottom of the drawn line
 	 */
@@ -192,24 +122,14 @@ public class FontRenderer
 	}
 
 	/**
-	 * Draws a single-line string centred horizontally within {@code bounds},
-	 * starting at the given {@code y} coordinate (top of the line, not baseline).
+	 * Draws a single-line string centred horizontally within {@code bounds}
+	 * using the currently configured font.
 	 *
 	 * @return the y coordinate of the bottom of the drawn line
 	 */
 	public int drawCenteredString(Graphics2D g, String text, Rectangle bounds, int y, Color color)
 	{
-		if (text == null || text.isEmpty())
-		{
-			return y;
-		}
-		Font font = getFont();
-		g.setFont(font);
-		g.setColor(color);
-		FontMetrics fm = g.getFontMetrics(font);
-		int x = bounds.x + (bounds.width - fm.stringWidth(text)) / 2;
-		g.drawString(text, x, y + fm.getAscent());
-		return y + fm.getHeight();
+		return drawCenteredString(g, text, bounds, y, color, getFont());
 	}
 
 	/**
@@ -236,17 +156,13 @@ public class FontRenderer
 		g.setFont(font);
 		FontMetrics fm = g.getFontMetrics(font);
 
-		int maxWidth = bounds.width - 8; // 4 px horizontal padding each side
+		int maxWidth  = bounds.width - 8; // 4 px horizontal padding each side
 		int lineHeight = fm.getHeight();
 		int y = startY;
 
-		// 1. Tokenise all segments into word tokens (preserving newline positions)
 		List<WordToken> tokens = tokenise(segments);
-
-		// 2. Layout tokens into display lines
 		List<List<WordToken>> lines = layoutLines(tokens, fm, maxWidth);
 
-		// 3. Draw each line centred inside bounds
 		for (List<WordToken> line : lines)
 		{
 			if (y + lineHeight > bounds.y + bounds.height)
@@ -262,7 +178,6 @@ public class FontRenderer
 			{
 				if (!firstToken)
 				{
-					// draw the space in the previous token's colour
 					g.setColor(tok.color);
 					g.drawString(" ", x, y + fm.getAscent());
 					x += fm.stringWidth(" ");
@@ -282,7 +197,6 @@ public class FontRenderer
 	// Private layout helpers
 	// -------------------------------------------------------------------------
 
-	/** Converts segments into a flat list of word tokens, inserting newline sentinels. */
 	private static List<WordToken> tokenise(List<TextSegment> segments)
 	{
 		List<WordToken> tokens = new ArrayList<>();
@@ -300,14 +214,13 @@ public class FontRenderer
 				}
 				if (li < lines.length - 1)
 				{
-					tokens.add(new WordToken("", seg.getColor(), true)); // forced newline
+					tokens.add(new WordToken("", seg.getColor(), true));
 				}
 			}
 		}
 		return tokens;
 	}
 
-	/** Groups tokens into lines that fit within {@code maxWidth}. */
 	private static List<List<WordToken>> layoutLines(List<WordToken> tokens,
 	                                                  FontMetrics fm,
 	                                                  int maxWidth)
@@ -327,7 +240,7 @@ public class FontRenderer
 				continue;
 			}
 
-			int wordWidth = fm.stringWidth(tok.word);
+			int wordWidth   = fm.stringWidth(tok.word);
 			int widthNeeded = current.isEmpty() ? wordWidth : (spaceWidth + wordWidth);
 
 			if (!current.isEmpty() && currentWidth + widthNeeded > maxWidth)
@@ -335,7 +248,7 @@ public class FontRenderer
 				lines.add(new ArrayList<>(current));
 				current.clear();
 				currentWidth = 0;
-				widthNeeded = wordWidth;
+				widthNeeded  = wordWidth;
 			}
 
 			current.add(tok);
@@ -350,7 +263,6 @@ public class FontRenderer
 		return lines;
 	}
 
-	/** Computes the pixel width of a rendered line (including inter-word spaces). */
 	private static int measureLine(List<WordToken> line, FontMetrics fm)
 	{
 		int width = 0;
@@ -372,14 +284,14 @@ public class FontRenderer
 
 	private static final class WordToken
 	{
-		final String word;
-		final Color color;
+		final String  word;
+		final Color   color;
 		final boolean newline;
 
 		WordToken(String word, Color color, boolean newline)
 		{
-			this.word = word;
-			this.color = color;
+			this.word    = word;
+			this.color   = color;
 			this.newline = newline;
 		}
 	}

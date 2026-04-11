@@ -3,9 +3,8 @@ package com.betterdialogue;
 import net.runelite.client.config.Config;
 import net.runelite.client.config.ConfigGroup;
 import net.runelite.client.config.ConfigItem;
+import net.runelite.client.config.ConfigSection;
 import net.runelite.client.config.Range;
-
-import java.awt.Color;
 
 @ConfigGroup("betterdialogue")
 public interface BetterDialogueConfig extends Config
@@ -15,44 +14,44 @@ public interface BetterDialogueConfig extends Config
 	// -------------------------------------------------------------------------
 
 	@ConfigItem(
-		keyName = "fontName",
+		keyName = "fontFamily",
 		name = "Font",
-		description = "Font used for all replaced dialogue text",
-		position = 0
+		description = "Font used for dialogue text",
+		position = 1
 	)
-	default FontChoice fontName()
+	default FontChoice fontFamily()
 	{
-		return FontChoice.ROBOTO;
+		return FontChoice.SANS_SERIF;
 	}
 
 	@ConfigItem(
 		keyName = "fontSize",
 		name = "Font Size",
-		description = "Point size of the replacement font (10–28)",
-		position = 1
+		description = "Size of dialogue text in pixels",
+		position = 2
 	)
-	@Range(min = 10, max = 28)
+	@Range(min = 10, max = 24)
 	default int fontSize()
 	{
-		return 16;
+		return 14;
 	}
 
 	@ConfigItem(
-		keyName = "customFontPath",
-		name = "Custom Font Path",
-		description = "Absolute path to a .ttf file. Only used when Font is set to 'Custom'.",
-		position = 2
+		keyName = "boldText",
+		name = "Bold",
+		description = "Use bold weight for dialogue text",
+		position = 3
 	)
-	default String customFontPath()
+	default boolean boldText()
 	{
-		return "";
+		return false;
 	}
 
 	@ConfigItem(
 		keyName = "antiAlias",
 		name = "Anti-aliasing",
-		description = "Enable smooth sub-pixel font rendering",
-		position = 3
+		description = "Smooth font edges (disable for a crisper pixel look)",
+		position = 4
 	)
 	default boolean antiAlias()
 	{
@@ -60,96 +59,46 @@ public interface BetterDialogueConfig extends Config
 	}
 
 	// -------------------------------------------------------------------------
-	// Colours
+	// Dialogue type toggles
 	// -------------------------------------------------------------------------
 
-	@ConfigItem(
-		keyName = "fontColor",
-		name = "Body Text Color",
-		description = "Default colour for dialogue body text (overridden by inline <col> tags)",
-		position = 10
+	@ConfigSection(
+		name = "Dialogue Types",
+		description = "Toggle which dialogues get replaced",
+		position = 5
 	)
-	default Color fontColor()
-	{
-		return Color.BLACK;
-	}
+	String dialogueTypes = "dialogueTypes";
 
 	@ConfigItem(
-		keyName = "npcNameColor",
-		name = "NPC / Player Name Color",
-		description = "Colour used to render the speaker's name above the dialogue",
-		position = 11
+		keyName = "replaceNpc",
+		name = "NPC Dialogue",
+		description = "",
+		section = "dialogueTypes",
+		position = 6
 	)
-	default Color npcNameColor()
-	{
-		return new Color(0x00008B); // dark blue
-	}
-
-	@ConfigItem(
-		keyName = "continueColor",
-		name = "Continue Prompt Color",
-		description = "Colour for 'Click here to continue'",
-		position = 12
-	)
-	default Color continueColor()
-	{
-		return new Color(0x00008B); // dark blue
-	}
-
-	@ConfigItem(
-		keyName = "optionHoverColor",
-		name = "Option Hover Color",
-		description = "Text colour when the mouse hovers over a dialogue option",
-		position = 13
-	)
-	default Color optionHoverColor()
-	{
-		return Color.WHITE; // matches vanilla OSRS highlight behaviour
-	}
-
-	@ConfigItem(
-		keyName = "optionFontSize",
-		name = "Option Font Size",
-		description = "Point size for option menu text. Option rows are only 16 px tall — keep this at 13 or below to avoid overflow.",
-		position = 14
-	)
-	@Range(min = 8, max = 16)
-	default int optionFontSize()
-	{
-		return 13;
-	}
-
-	// -------------------------------------------------------------------------
-	// Per-type toggles
-	// -------------------------------------------------------------------------
-
-	@ConfigItem(
-		keyName = "replaceNpcDialogue",
-		name = "Replace NPC Dialogue",
-		description = "Apply custom font to NPC speech boxes",
-		position = 20
-	)
-	default boolean replaceNpcDialogue()
+	default boolean replaceNpc()
 	{
 		return true;
 	}
 
 	@ConfigItem(
-		keyName = "replacePlayerDialogue",
-		name = "Replace Player Dialogue",
-		description = "Apply custom font to player response boxes",
-		position = 21
+		keyName = "replacePlayer",
+		name = "Player Dialogue",
+		description = "",
+		section = "dialogueTypes",
+		position = 7
 	)
-	default boolean replacePlayerDialogue()
+	default boolean replacePlayer()
 	{
 		return true;
 	}
 
 	@ConfigItem(
 		keyName = "replaceOptions",
-		name = "Replace Option Menus",
-		description = "Apply custom font to multi-choice option menus",
-		position = 22
+		name = "Option Menus",
+		description = "",
+		section = "dialogueTypes",
+		position = 8
 	)
 	default boolean replaceOptions()
 	{
@@ -157,14 +106,14 @@ public interface BetterDialogueConfig extends Config
 	}
 
 	@ConfigItem(
-		keyName = "replaceSpriteDialogue",
-		name = "Replace Item/Action Dialogue",
-		description = "Apply custom font to sprite / item dialogue boxes",
-		position = 23
+		keyName = "replaceSprite",
+		name = "Item/Action Dialogue",
+		description = "",
+		section = "dialogueTypes",
+		position = 9
 	)
-	default boolean replaceSpriteDialogue()
+	default boolean replaceSprite()
 	{
 		return true;
 	}
 }
-
