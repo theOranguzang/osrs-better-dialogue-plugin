@@ -4,7 +4,13 @@ A RuneLite plugin that replaces the hard-to-read OSRS dialogue font with a clean
 
 ## Before / After
 
-<!-- USER: Add before/after screenshot images here -->
+![img.png](img.png)
+
+![img_1.png](img_1.png)
+
+![img_2.png](img_2.png)
+
+![img_3.png](img_3.png)
 
 ## What it does
 
