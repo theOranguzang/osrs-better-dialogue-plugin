@@ -37,7 +37,7 @@ provides a full `Graphics2D` context drawn after the engine finishes a frame.
 │  1. fill background rect (covers     │
 │     any residual bitmap text)        │
 │  2. drawWrappedText() with           │
-│     configured TrueType font         │
+│     configured system font           │
 └──────────────────────────────────────┘
 ```
 
@@ -51,7 +51,8 @@ provides a full `Graphics2D` context drawn after the engine finishes a frame.
 onClientTick  (~50 fps, every client frame)
   └─ DialogueWidgetManager.getCurrentDialogue()
       ├─ Check each dialogue root widget for visibility
-      ├─ If visible:
+      │   AND check the per-type config toggle (replaceNpc, replacePlayer, etc.)
+      ├─ If visible AND enabled:
       │   ├─ read widget.getText()
       │   ├─ if non-empty → parse colour/break tags → update text cache
       │   ├─ widget.setText("")     ← blank the widget EVERY frame
@@ -61,12 +62,21 @@ onClientTick  (~50 fps, every client frame)
 BetterDialogueOverlay.render(Graphics2D)  (called every rendered frame)
   ├─ reBlankWidgets(state)   ← belt-and-suspenders blank before any pixels written
   ├─ fontRenderer.applyRenderingHints()
-  └─ switch(state.getType())
+  └─ switch(state.getType())  [each case also guarded by its config toggle]
       ├─ NPC / Player  → fillBackground() + drawWrappedText()
       ├─ Options       → per-option fillBackground() + drawCenteredString()
       │                  + hover colour detection via mouse position
       └─ Sprite        → fillBackground() + drawWrappedText()
 ```
+
+### Config toggles gate detection, not just rendering
+
+Each dialogue type toggle (`replaceNpc`, `replacePlayer`, `replaceOptions`,
+`replaceSprite`) is checked **in `DialogueWidgetManager.detectAndBuild()`**
+before the widget is ever touched. When a type is disabled the plugin neither
+blanks its widgets nor renders anything — the original bitmap font stays
+visible. Checking only in `render()` would blank the widget but paint nothing,
+showing an empty dialogue box.
 
 ### Why `ClientTick` instead of `GameTick`
 
@@ -169,16 +179,26 @@ Child indices within each group are documented in
 
 ## Font system
 
-`FontRenderer` resolves a `java.awt.Font` in this priority order:
+`FontRenderer` creates a `java.awt.Font` using **Java logical font names**:
 
-1. **Custom file path** — when `FontChoice.CUSTOM` is selected and a valid
-   `.ttf` path is configured
-2. **Bundled TTF resource** — `src/main/resources/fonts/<name>-Regular.ttf`
-   (must be supplied manually from Google Fonts; see README)
-3. **JVM fallback** — `Font.SANS_SERIF` at the configured size
+```java
+int style = config.boldText() ? Font.BOLD : Font.PLAIN;
+new Font(config.fontFamily().getJavaName(), style, config.fontSize())
+```
 
-The resolved font is cached; it is only recreated when the `FontChoice`, font
-size, or custom path config values change.
+Java logical fonts (`SansSerif`, `Serif`, `Monospaced`, `Dialog`, `DialogInput`)
+always resolve to system fonts — no bundled TTF files are required and there is
+no risk of a missing-font error on any OS.
+
+The font is cached as a single `Font` instance. It is only rebuilt when the
+family, size, or bold flag changes, using a string key:
+
+```java
+String key = config.fontFamily().getJavaName() + "_" + config.fontSize() + "_" + config.boldText();
+```
+
+`FontRenderer.getOptionFont()` returns the same font as `getFont()` — one font
+for everything keeps the config panel simple.
 
 `FontRenderer.drawWrappedText()` implements word-wrapping using
 `FontMetrics.stringWidth()` and centres each line horizontally within the
@@ -195,7 +215,7 @@ handles:
 |-----|---------|----------|
 | `<col=RRGGBB>` | Set text colour | Parsed; drives `TextSegment.color` |
 | `</col>` | Reset to default colour | Resets `currentColor` |
-| `<br>` | Line break | Replaced with `\n` before splitting |
+| `<br>` | Line break (baked at Quill 8 character widths) | **Collapsed to a space.** The game's break-points are meaningless for other fonts; `FontRenderer` re-wraps from scratch using its own `FontMetrics`. |
 | `<lt>` / `<gt>` | Literal `<` / `>` | Replaced before tag scanning |
 | `<shad>`, `<str>`, `<u>`, etc. | Shadow, strikethrough, underline | Silently ignored |
 

@@ -30,8 +30,8 @@ Shown when an NPC is speaking to the player.
 | Child index | Contents | Plugin action |
 |-------------|----------|---------------|
 | 0 | Root container (visibility check) | Checked for `isHidden()` |
-| 4 | NPC name text | Read → `cachedNpcName`; not blanked (name rendered separately) |
-| 5 | "Click here to continue" | Blanked via `reBlankWidgets()` in overlay |
+| 4 | NPC name text | Read → `cachedNpcName`; blanked by `reBlankWidgets()` in overlay |
+| 5 | "Click here to continue" | Blanked by `reBlankWidgets()` in overlay |
 | 6 | Body text | **Blanked every frame**; content → `cachedNpcBody` |
 
 ---
@@ -43,8 +43,8 @@ Shown when the player's response is displayed in the chatbox.
 | Child index | Contents | Plugin action |
 |-------------|----------|---------------|
 | 0 | Root container | Checked for `isHidden()` |
-| 4 | Player name text | Read → `cachedPlayerName` |
-| 5 | "Click here to continue" | Blanked via `reBlankWidgets()` |
+| 4 | Player name text | Read → `cachedPlayerName`; blanked by `reBlankWidgets()` in overlay |
+| 5 | "Click here to continue" | Blanked by `reBlankWidgets()` in overlay |
 | 6 | Body text | **Blanked every frame**; content → `cachedPlayerBody` |
 
 ---
@@ -53,19 +53,30 @@ Shown when the player's response is displayed in the chatbox.
 
 Shown for multi-choice dialogue (1–5 options).
 
-| Child index | Contents | Plugin action |
-|-------------|----------|---------------|
-| 0 | Root container | Checked for `isHidden()` |
-| 1 | Title / header ("Choose an option") | Read → `cachedOptionTitle` |
-| 2 | Option 1 text | **Blanked every frame**; content → `cachedOptionTexts[0]` |
-| 3 | Option 2 text | **Blanked every frame**; content → `cachedOptionTexts[1]` |
-| 4 | Option 3 text | **Blanked every frame**; content → `cachedOptionTexts[2]` |
-| 5 | Option 4 text | **Blanked every frame**; content → `cachedOptionTexts[3]` |
-| 6 | Option 5 text | **Blanked every frame**; content → `cachedOptionTexts[4]` |
+The plugin accesses this dialogue via **static child 1**, which is a container
+widget. All text lives in the **dynamic children** of that container — NOT in
+static children 2–6. This is confirmed via the Widget Inspector.
 
-The plugin loops children `OPTION_CHILD_FIRST` (2) through
-`OPTION_CHILD_FIRST + OPTION_COUNT - 1` (6) and skips any that are hidden or
-have empty text (unused option slots).
+```java
+Widget container    = client.getWidget(InterfaceID.DIALOG_OPTION, 1);
+Widget[] dynChildren = container.getDynamicChildren();
+// dynChildren[0]   = title ("Select an option")  HasListener=false, color=0x800000
+// dynChildren[1..n] = clickable option rows       HasListener=true
+```
+
+| Dynamic child index | Contents | Plugin action |
+|---------------------|----------|---------------|
+| 0 | Title — "Select an option" | Read → `cachedOptionTitle`; ref preserved in `cachedOptionTitleWidget`; **blanked every frame** |
+| 1 | Option row 1 | Read → `cachedOptionTexts[0]`; **blanked every frame** |
+| 2 | Option row 2 | Read → `cachedOptionTexts[1]`; **blanked every frame** |
+| … | … | … |
+| n | Option row n | Read → `cachedOptionTexts[n-1]`; **blanked every frame** |
+
+Hidden dynamic children (unused option slots) are skipped.
+
+> ⚠️ **Do not use static child indices 2–6 for option text.** The static
+> children of `DIALOG_OPTION` do not hold the option strings in the current
+> game client. All option text is in dynamic children of static child 1.
 
 ---
 
@@ -78,7 +89,7 @@ Shown for item-description and action-result dialogues
 |-------------|----------|---------------|
 | 0 | Root container | Checked for `isHidden()` |
 | 2 | Body text | **Blanked every frame**; content → `cachedSpriteBody` |
-| 3 | "Click here to continue" | Blanked via `reBlankWidgets()` |
+| 3 | "Click here to continue" | Blanked by `reBlankWidgets()` in overlay |
 
 ---
 
@@ -100,6 +111,7 @@ private static final int NPC_CHILD_CONTINUE = 5;  // ← update here
 ```
 
 5. Compile with `./gradlew compileJava` and re-test in-game.
+6. **Update this file** to reflect the new indices.
 
 ---
 
