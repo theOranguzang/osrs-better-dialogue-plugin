@@ -1,0 +1,175 @@
+# GitHub Copilot Instructions — Better Dialogue Plugin
+
+## What this repo is
+
+A **RuneLite plugin** that replaces the hard-to-read OSRS bitmap cursive font
+(Quill 8 / "Freehand") with a clean, user-configurable TrueType font. It works
+by blanking original widget text each frame and painting replacement text on top
+via a `Graphics2D` overlay — the only way to change fonts inside RuneLite since
+`Widget.setText()` cannot change the rendering font.
+
+**Language:** Java 11  
+**Build system:** Gradle (standard RuneLite plugin-hub layout)  
+**Key dependencies:** `net.runelite:client` (compileOnly), Lombok, JUnit 4
+
+---
+
+## Docs — read these first
+
+| File | What it covers |
+|------|---------------|
+| [`docs/architecture.md`](docs/architecture.md) | End-to-end design: why overlay, rendering pipeline, capture-then-blank pattern, font system, edge cases |
+| [`docs/widget-reference.md`](docs/widget-reference.md) | All widget group/child IDs, how to use the in-game Widget Inspector, update procedure after game patches |
+
+---
+
+## Source file map
+
+All plugin source lives in `src/main/java/com/betterdialogue/`.
+
+| File | Role |
+|------|------|
+| [`BetterDialoguePlugin.java`](src/main/java/com/betterdialogue/BetterDialoguePlugin.java) | Main plugin class. Registers/removes the overlay, subscribes to `ClientTick`, calls `DialogueWidgetManager` each frame, provides config via Guice. |
+| [`BetterDialogueConfig.java`](src/main/java/com/betterdialogue/BetterDialogueConfig.java) | RuneLite config interface. Font choice, font size, custom TTF path, anti-aliasing, three colour pickers, four per-type enable toggles. |
+| [`BetterDialogueOverlay.java`](src/main/java/com/betterdialogue/BetterDialogueOverlay.java) | `OverlayLayer.ABOVE_WIDGETS` overlay. Re-blanks widgets in-frame, fills background rect, delegates text rendering to `FontRenderer`. |
+| [`DialogueWidgetManager.java`](src/main/java/com/betterdialogue/DialogueWidgetManager.java) | Detects active dialogue each tick, implements the **capture-then-blank** text cache pattern, parses `<col>`/`<br>` tags, restores widget text on shutdown. |
+| [`FontRenderer.java`](src/main/java/com/betterdialogue/FontRenderer.java) | Loads TTF fonts (resource → custom file → JVM fallback), caches derived `Font` objects, word-wraps via `FontMetrics`, draws centred lines. |
+| [`DialogueState.java`](src/main/java/com/betterdialogue/DialogueState.java) | Immutable per-frame snapshot: dialogue type, cached text segments, option strings, live widget references for bounds. |
+| [`DialogueType.java`](src/main/java/com/betterdialogue/DialogueType.java) | Enum of supported dialogue types: `NPC_DIALOGUE`, `PLAYER_DIALOGUE`, `OPTION_DIALOGUE`, `SPRITE_DIALOGUE`, `LEVEL_UP`, `QUEST_COMPLETE`. |
+| [`TextSegment.java`](src/main/java/com/betterdialogue/TextSegment.java) | Immutable `(text, color)` pair. One segment per colour run after parsing inline tags. |
+| [`FontChoice.java`](src/main/java/com/betterdialogue/FontChoice.java) | Enum of bundled font options (Roboto, Inter, Open Sans, Lato, Source Sans 3, Custom). Each entry holds the classpath resource path for its TTF file. |
+
+Test runner: [`src/test/java/com/betterdialogue/BetterDialoguePluginTest.java`](src/test/java/com/betterdialogue/BetterDialoguePluginTest.java) — launches RuneLite with the plugin loaded via `./gradlew run`.
+
+---
+
+## Key design decisions (do not break these)
+
+### 1. Capture-then-blank — never parse a widget you've already blanked
+
+`DialogueWidgetManager` updates its segment caches **only** when
+`widget.getText()` returns a non-empty string. It then calls `widget.setText("")`
+**every frame** regardless. The overlay always reads from the cache, never from
+the live widget. See [`docs/architecture.md`](docs/architecture.md#the-capture-then-blank-pattern).
+
+```
+getText() non-empty  →  update cache  →  blank widget
+getText() empty      →  leave cache   →  blank widget (no-op)
+render()             →  read cache    →  paint
+```
+
+### 2. `ClientTick` not `GameTick`
+
+The plugin subscribes to `ClientTick` (~50 fps) rather than `GameTick` (~1.67 fps).
+Swapping this back to `GameTick` reintroduces a visible flash of the original
+Quill font on the first ~600 ms of every new dialogue.
+
+### 3. Double-blank: tick + render
+
+`BetterDialogueOverlay.render()` calls `reBlankWidgets()` again at the very top
+(before painting). This closes the narrow window between the `ClientTick` handler
+and the overlay draw call where the engine could reset widget text. Do not remove
+this call.
+
+### 4. Cache lifetime tracking
+
+`DialogueWidgetManager.lastSeenType` detects when the active dialogue type
+changes and calls `clearCacheFor(previousType)`. This prevents stale text from
+one NPC bleeding into the first frame of a new NPC's dialogue. Do not bypass
+this with direct cache mutation.
+
+---
+
+## Getting started quickly
+
+### Build and run
+
+```bash
+./gradlew compileJava          # compile only
+./gradlew run                  # launch RuneLite with the plugin loaded (dev mode)
+./gradlew build                # compile + test
+./gradlew shadowJar            # fat JAR for distribution
+```
+
+Requires **JDK 11+**. Set `JAVA_HOME` if it is not on `PATH`.
+
+### Add a bundled font
+
+1. Download the font from [Google Fonts](https://fonts.google.com).
+2. Drop the Regular weight TTF into `src/main/resources/fonts/` using the exact
+   filename expected by `FontChoice` (e.g. `Roboto-Regular.ttf`).
+3. The font will be loaded automatically; no code changes needed.
+
+### Verify widget indices after a game update
+
+See [`docs/widget-reference.md`](docs/widget-reference.md#updating-indices-after-a-game-update).
+Indices change when Jagex updates the dialogue interface. The process takes
+~5 minutes with the in-game Widget Inspector.
+
+### Add a new dialogue type
+
+1. Add a value to `DialogueType`.
+2. Add a `buildXxxState()` method to `DialogueWidgetManager` following the
+   capture-then-blank pattern. Add per-type cache fields and a `clearCacheFor`
+   case.
+3. Add a `renderXxxDialogue()` method to `BetterDialogueOverlay`.
+4. Add the config toggle to `BetterDialogueConfig` and wire it up in the
+   overlay's `render()` switch.
+5. Update [`docs/widget-reference.md`](docs/widget-reference.md) with the new
+   widget group and child indices.
+
+---
+
+## Repo maintenance and best practices
+
+### Widget indices drift — treat as high priority
+
+Widget child indices are the most likely thing to break after a game update. If
+players report blank dialogue boxes (text disappears but nothing appears), the
+first thing to check is whether the indices in `DialogueWidgetManager` still
+match the live widget tree. Use the Widget Inspector and fix the constants.
+Always update `docs/widget-reference.md` at the same time.
+
+### Never store widget text references across ticks
+
+`Widget` objects returned by `client.getWidget()` are live references into the
+game engine's memory. Their text content can change between ticks. Always read
+`.getText()` inside `onClientTick`, never cache a widget's text string between
+calls — only cache the parsed `List<TextSegment>` result.
+
+### Restoring widget text on shutdown is mandatory
+
+`DialogueWidgetManager.restoreAll()` is called from `BetterDialoguePlugin.shutDown()`.
+If you add a new widget-blanking site elsewhere in the codebase, you must ensure
+those widgets are also covered by `restoreAll()`. Failure to do so leaves the
+game in a broken state with empty dialogue boxes after the plugin is disabled.
+
+### One source of truth for the config group key
+
+The config group name `"betterdialogue"` in `@ConfigGroup` must match anywhere
+a config key is read by string (e.g. if you ever use `ConfigManager.getConfiguration()`
+directly). There is currently only one place — `BetterDialogueConfig` — keep it
+that way.
+
+### Keep `FontRenderer` stateless except for the font cache
+
+`FontRenderer` caches only the derived `Font` object (invalidated when config
+changes). Do not add mutable rendering state to it. All layout information
+(bounds, segments) is passed in per call and must not be stored on the instance.
+
+### Commit hygiene
+
+- Prefix commits with the component they touch:
+  `overlay:`, `widget-manager:`, `font:`, `config:`, `docs:`, `build:`
+- Always run `./gradlew compileJava` before pushing.
+- Update the relevant `docs/` file when changing widget indices, adding dialogue
+  types, or changing the config schema.
+
+### Dependency updates
+
+- Keep `net.runelite:client` on `latest.release` — this tracks RuneLite's
+  published releases and is correct for plugin-hub submissions.
+- Lombok version can be updated freely; the only risk is annotation-processor
+  API changes.
+- JUnit is test-only and does not affect the distributed plugin.
+
