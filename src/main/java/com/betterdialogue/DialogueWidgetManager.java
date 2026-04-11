@@ -503,10 +503,17 @@ public class DialogueWidgetManager
 			return segments;
 		}
 
+		// Replace <br> with a SPACE, not \n.
+		// The game bakes <br> tags into widget text at Quill 8 character-width boundaries.
+		// Those break-points are meaningless for any other font.  Collapsing them to spaces
+		// lets FontRenderer.drawWrappedText() re-wrap the text from scratch using the
+		// configured TrueType font's own FontMetrics — producing correct line breaks.
 		String text = raw
-			.replace("<br>", "\n")
+			.replace("<br>", " ")
 			.replace("<lt>", "<")
-			.replace("<gt>", ">");
+			.replace("<gt>", ">")
+			.replaceAll("\\s{2,}", " ") // collapse double-spaces from adjacent <br>s
+			.trim();
 
 		Color currentColor = defaultColor;
 		int pos = 0;
