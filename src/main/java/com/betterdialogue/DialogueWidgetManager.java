@@ -112,6 +112,14 @@ public class DialogueWidgetManager
 	/** Which dialogue type was active on the previous call to {@link #getCurrentDialogue()}. */
 	private DialogueType lastSeenType = null;
 
+	/**
+	 * One-shot flag: dump option widget tree to the log the first time the
+	 * option dialogue is detected.  Reset when the dialogue closes so the dump
+	 * fires again if the player opens another option menu later.
+	 * Set to {@code false} to re-enable the dump at any time.
+	 */
+	private boolean optionDebugDumped = false;
+
 	// -------------------------------------------------------------------------
 	// Public API
 	// -------------------------------------------------------------------------
@@ -185,6 +193,7 @@ public class DialogueWidgetManager
 		Widget optionRoot = client.getWidget(InterfaceID.DIALOG_OPTION, 0);
 		if (isVisible(optionRoot))
 		{
+			debugDumpOptionWidget(optionRoot);
 			return buildOptionState();
 		}
 
@@ -406,6 +415,7 @@ public class DialogueWidgetManager
 				cachedOptionTexts   = Collections.emptyList();
 				cachedOptionWidgets = new Widget[0];
 				cachedOptionTitle   = "";
+				optionDebugDumped   = false; // allow re-dump next time options open
 				break;
 			case SPRITE_DIALOGUE:
 				cachedSpriteBody = Collections.emptyList();
@@ -418,6 +428,95 @@ public class DialogueWidgetManager
 	// -------------------------------------------------------------------------
 	// Widget blanking
 	// -------------------------------------------------------------------------
+
+	/**
+	 * One-shot diagnostic dump: logs the full child tree of the option dialogue
+	 * root widget so the correct child indices / child type can be determined
+	 * without guessing.  Fires once per option-dialogue session (resets on close).
+	 *
+	 * <p>Look for lines like:
+	 * <pre>
+	 *   [OPTION debug] static  child 0: id=... text='Select an Option' hidden=false
+	 *   [OPTION debug] dynamic child 3: id=... text='I'd like to access my bank' hidden=false
+	 * </pre>
+	 * That tells you <em>which child type</em> (static vs dynamic) and <em>which
+	 * index</em> to use in {@link #buildOptionState()}.
+	 */
+	private void debugDumpOptionWidget(Widget root)
+	{
+		if (optionDebugDumped)
+		{
+			return;
+		}
+		optionDebugDumped = true;
+
+		log.info("[OPTION debug] root={} hidden={} id={}",
+			root, root.isHidden(), root.getId());
+
+		// -- Static children (accessed via client.getWidget(group, childIdx)) --
+		Widget[] staticKids = root.getStaticChildren();
+		if (staticKids != null)
+		{
+			log.info("[OPTION debug] {} static children:", staticKids.length);
+			for (int i = 0; i < staticKids.length; i++)
+			{
+				Widget w = staticKids[i];
+				log.info("  [OPTION debug] static  child {:2d}: id={} text='{}' hidden={}",
+					i, w.getId(), w.getText(), w.isHidden());
+			}
+		}
+		else
+		{
+			log.info("[OPTION debug] static children: null");
+		}
+
+		// -- Dynamic children (list-item style children populated at runtime) --
+		Widget[] dynKids = root.getDynamicChildren();
+		if (dynKids != null)
+		{
+			log.info("[OPTION debug] {} dynamic children:", dynKids.length);
+			for (int i = 0; i < dynKids.length; i++)
+			{
+				Widget w = dynKids[i];
+				log.info("  [OPTION debug] dynamic child {:2d}: id={} text='{}' hidden={}",
+					i, w.getId(), w.getText(), w.isHidden());
+			}
+		}
+		else
+		{
+			log.info("[OPTION debug] dynamic children: null");
+		}
+
+		// -- Nested children --
+		Widget[] nestedKids = root.getNestedChildren();
+		if (nestedKids != null)
+		{
+			log.info("[OPTION debug] {} nested children:", nestedKids.length);
+			for (int i = 0; i < nestedKids.length; i++)
+			{
+				Widget w = nestedKids[i];
+				log.info("  [OPTION debug] nested  child {:2d}: id={} text='{}' hidden={}",
+					i, w.getId(), w.getText(), w.isHidden());
+			}
+		}
+		else
+		{
+			log.info("[OPTION debug] nested children: null");
+		}
+
+		// -- Flat index walk via client.getWidget(group, i) for i = 0..15 --
+		// This confirms which indices are accessible as top-level children.
+		log.info("[OPTION debug] flat getWidget({}, i) walk:", InterfaceID.DIALOG_OPTION);
+		for (int i = 0; i <= 15; i++)
+		{
+			Widget w = client.getWidget(InterfaceID.DIALOG_OPTION, i);
+			if (w != null)
+			{
+				log.info("  [OPTION debug] getWidget({},{:2d}): text='{}' hidden={}",
+					InterfaceID.DIALOG_OPTION, i, w.getText(), w.isHidden());
+			}
+		}
+	}
 
 	/**
 	 * Saves a widget's original text (for shutdown restoration) then blanks it.
