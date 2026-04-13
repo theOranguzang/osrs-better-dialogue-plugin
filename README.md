@@ -12,6 +12,8 @@ A RuneLite plugin that replaces the hard-to-read OSRS dialogue font with a clean
 
 ![img_3.png](img_3.png)
 
+![img_4.png](img_4.png)
+
 ## What it does
 
 Replaces the bitmap "Quill 8" cursive font in dialogue boxes with a readable font rendered via overlay. Covers:
