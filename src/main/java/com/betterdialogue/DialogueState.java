@@ -77,5 +77,11 @@ public class DialogueState
 	 * {@code null} for all other types.
 	 */
 	private final Widget[] optionWidgets;
-}
 
+	/**
+	 * Cached text from the "Click here to continue" / "Please wait..." widget,
+	 * tags stripped.  Empty string when the dialogue type has no continue widget
+	 * or the widget hasn't been seen yet.
+	 */
+	private final String continueText;
+}

@@ -142,13 +142,16 @@ public class DialogueWidgetManager
 	// blanked it ourselves), ensuring the overlay always has something to paint.
 	// -------------------------------------------------------------------------
 
-	private List<TextSegment> cachedNpcBody    = Collections.emptyList();
-	private String            cachedNpcName    = "";
+	private List<TextSegment> cachedNpcBody     = Collections.emptyList();
+	private String            cachedNpcName     = "";
+	private String            cachedNpcContinue = "";
 
-	private List<TextSegment> cachedPlayerBody = Collections.emptyList();
-	private String            cachedPlayerName = "";
+	private List<TextSegment> cachedPlayerBody     = Collections.emptyList();
+	private String            cachedPlayerName     = "";
+	private String            cachedPlayerContinue = "";
 
-	private List<TextSegment> cachedSpriteBody = Collections.emptyList();
+	private List<TextSegment> cachedSpriteBody     = Collections.emptyList();
+	private String            cachedSpriteContinue = "";
 
 	private List<String> cachedOptionTexts   = Collections.emptyList();
 	private Widget[]     cachedOptionWidgets = new Widget[0];
@@ -285,9 +288,20 @@ public class DialogueWidgetManager
 			cachedNpcName = nameWidget != null ? stripTags(nameWidget.getText()) : "";
 		}
 
-		// ---- Blank: always, every frame ----
+		// Capture continue text (e.g. "Click here to continue" / "Please wait...")
+		if (continueWidget != null)
+		{
+			String rawContinue = continueWidget.getText();
+			if (rawContinue != null && !rawContinue.isEmpty())
+			{
+				cachedNpcContinue = stripTags(rawContinue);
+			}
+		}
+
+		// ---- Blank name + body; camouflage continue so spacebar still works ----
 		blankWidget(textWidget);
 		blankWidget(nameWidget);
+		camouflageWidget(continueWidget); // setTextColor, not setText("") — engine needs text for spacebar
 
 		// If we've never seen any text yet, nothing to render
 		if (cachedNpcBody.isEmpty())
@@ -304,7 +318,8 @@ public class DialogueWidgetManager
 			textWidget,
 			nameWidget,
 			continueWidget,
-			null
+			null,
+			cachedNpcContinue
 		);
 	}
 
@@ -326,8 +341,19 @@ public class DialogueWidgetManager
 			cachedPlayerName = nameWidget != null ? stripTags(nameWidget.getText()) : "";
 		}
 
+		// Capture continue text
+		if (continueWidget != null)
+		{
+			String rawContinue = continueWidget.getText();
+			if (rawContinue != null && !rawContinue.isEmpty())
+			{
+				cachedPlayerContinue = stripTags(rawContinue);
+			}
+		}
+
 		blankWidget(textWidget);
 		blankWidget(nameWidget);
+		camouflageWidget(continueWidget); // setTextColor, not setText("") — engine needs text for spacebar
 
 		if (cachedPlayerBody.isEmpty())
 		{
@@ -342,7 +368,8 @@ public class DialogueWidgetManager
 			textWidget,
 			nameWidget,
 			continueWidget,
-			null
+			null,
+			cachedPlayerContinue
 		);
 	}
 
@@ -424,7 +451,8 @@ public class DialogueWidgetManager
 			container,               // textWidget — used for bounds & visibility checks
 			cachedOptionTitleWidget, // nameWidget — re-blanked by reBlankWidgets()
 			null,
-			cachedOptionWidgets      // option dynamic children
+			cachedOptionWidgets,     // option dynamic children
+			""                       // no continue widget for option dialogue
 		);
 	}
 
@@ -444,7 +472,18 @@ public class DialogueWidgetManager
 			cachedSpriteBody = parseSegments(raw, Color.BLACK);
 		}
 
+		// Capture continue text
+		if (continueWidget != null)
+		{
+			String rawContinue = continueWidget.getText();
+			if (rawContinue != null && !rawContinue.isEmpty())
+			{
+				cachedSpriteContinue = stripTags(rawContinue);
+			}
+		}
+
 		blankWidget(textWidget);
+		camouflageWidget(continueWidget); // setTextColor, not setText("") — engine needs text for spacebar
 
 		if (cachedSpriteBody.isEmpty())
 		{
@@ -459,7 +498,8 @@ public class DialogueWidgetManager
 			textWidget,
 			null,
 			continueWidget,
-			null
+			null,
+			cachedSpriteContinue
 		);
 	}
 
@@ -476,12 +516,14 @@ public class DialogueWidgetManager
 		switch (type)
 		{
 			case NPC_DIALOGUE:
-				cachedNpcBody = Collections.emptyList();
-				cachedNpcName = "";
+				cachedNpcBody     = Collections.emptyList();
+				cachedNpcName     = "";
+				cachedNpcContinue = "";
 				break;
 			case PLAYER_DIALOGUE:
-				cachedPlayerBody = Collections.emptyList();
-				cachedPlayerName = "";
+				cachedPlayerBody     = Collections.emptyList();
+				cachedPlayerName     = "";
+				cachedPlayerContinue = "";
 				break;
 			case OPTION_DIALOGUE:
 				cachedOptionTexts       = Collections.emptyList();
@@ -490,7 +532,8 @@ public class DialogueWidgetManager
 				cachedOptionTitleWidget = null;
 				break;
 			case SPRITE_DIALOGUE:
-				cachedSpriteBody = Collections.emptyList();
+				cachedSpriteBody     = Collections.emptyList();
+				cachedSpriteContinue = "";
 				break;
 			default:
 				break;

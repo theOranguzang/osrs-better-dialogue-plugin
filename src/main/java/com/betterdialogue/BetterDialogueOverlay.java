@@ -193,6 +193,9 @@ public class BetterDialogueOverlay extends Overlay
 
 		// ---- Body ----
 		fontRenderer.drawWrappedText(g, state.getBodySegments(), bounds, bounds.y + V_PADDING);
+
+		// ---- Continue ("Click here to continue" / "Please wait...") ----
+		renderContinueText(g, state);
 	}
 
 	private void renderPlayerDialogue(Graphics2D g, DialogueState state)
@@ -225,6 +228,9 @@ public class BetterDialogueOverlay extends Overlay
 
 		// ---- Body ----
 		fontRenderer.drawWrappedText(g, state.getBodySegments(), bounds, bounds.y + V_PADDING);
+
+		// ---- Continue ----
+		renderContinueText(g, state);
 	}
 
 	private void renderOptionDialogue(Graphics2D g, DialogueState state)
@@ -323,6 +329,35 @@ public class BetterDialogueOverlay extends Overlay
 		}
 
 		fontRenderer.drawWrappedText(g, state.getBodySegments(), bounds, bounds.y + V_PADDING);
+
+		// ---- Continue ----
+		renderContinueText(g, state);
+	}
+
+	/**
+	 * Renders the cached "Click here to continue" / "Please wait..." text
+	 * centred within the continue widget's bounds, in dark blue to match vanilla.
+	 * The widget text was blanked by the manager and by {@link #reBlankWidgets};
+	 * this overlay paints our replacement on top using the configured font.
+	 */
+	private void renderContinueText(Graphics2D g, DialogueState state)
+	{
+		String continueText = state.getContinueText();
+		if (continueText == null || continueText.isEmpty())
+		{
+			return;
+		}
+		Widget continueWidget = state.getContinueWidget();
+		if (continueWidget == null || continueWidget.isHidden())
+		{
+			return;
+		}
+		Rectangle cb = continueWidget.getBounds();
+		if (cb == null || cb.width <= 0)
+		{
+			return;
+		}
+		fontRenderer.drawCenteredString(g, continueText, cb, centreY(g, cb, fontRenderer.getFont()), NAME_COLOR);
 	}
 
 	// -------------------------------------------------------------------------
@@ -364,6 +399,7 @@ public class BetterDialogueOverlay extends Overlay
 		else
 		{
 			safeBlank(state.getNameWidget());
+			safeCamouflage(state.getContinueWidget()); // camouflage, not blank — engine needs text for spacebar
 			Widget[] optWidgets = state.getOptionWidgets();
 			if (optWidgets != null)
 			{
