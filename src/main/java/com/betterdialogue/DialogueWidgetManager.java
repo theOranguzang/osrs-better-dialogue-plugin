@@ -78,6 +78,15 @@ public class DialogueWidgetManager
 	// Widget child indices (verify with Widget Inspector)
 	// -------------------------------------------------------------------------
 
+	/**
+	 * Text colour used to camouflage option-menu widget text against the
+	 * parchment background.  The engine key handler (1–5 shortcuts) reads
+	 * widget text content, not colour, so keeping the text intact while making
+	 * it invisible preserves keyboard selection.
+	 * Value matches the vanilla OSRS dialogue parchment: {@code #D6CCAF}.
+	 */
+	static final int OPTION_CAMOUFLAGE_COLOR = 0xD6CCAF;
+
 	private static final int NPC_CHILD_NAME     = 4;
 	private static final int NPC_CHILD_TEXT     = 6;
 	private static final int NPC_CHILD_CONTINUE = 5;
@@ -118,6 +127,13 @@ public class DialogueWidgetManager
 	/** Maps each blanked widget to its original text so it can be restored on shutdown. */
 	private final Map<Widget, String> savedTexts = new HashMap<>();
 
+	/**
+	 * Maps each camouflaged option widget to its original text colour so it
+	 * can be restored on shutdown.  Option widgets are camouflaged rather than
+	 * blanked so the engine key handler (1–5) can still read their text.
+	 */
+	private final Map<Widget, Integer> savedColors = new HashMap<>();
+
 	// -------------------------------------------------------------------------
 	// Per-type text caches
 	//
@@ -140,8 +156,8 @@ public class DialogueWidgetManager
 	/**
 	 * Stable reference to the title dynamic child widget (dynamic index 0 of the
 	 * options container).  Preserved across frames so {@link BetterDialogueOverlay}
-	 * can re-blank it in {@code reBlankWidgets()} even on frames where the text
-	 * is already "".
+	 * can re-camouflage it in {@code reBlankWidgets()} even on frames where the
+	 * text colour has already been set.
 	 */
 	private Widget       cachedOptionTitleWidget = null;
 
@@ -194,6 +210,20 @@ public class DialogueWidgetManager
 			}
 		}
 		savedTexts.clear();
+
+		for (Map.Entry<Widget, Integer> entry : savedColors.entrySet())
+		{
+			try
+			{
+				entry.getKey().setTextColor(entry.getValue());
+			}
+			catch (Exception e)
+			{
+				log.warn("Failed to restore widget text color", e);
+			}
+		}
+		savedColors.clear();
+
 		clearCacheFor(DialogueType.NPC_DIALOGUE);
 		clearCacheFor(DialogueType.PLAYER_DIALOGUE);
 		clearCacheFor(DialogueType.OPTION_DIALOGUE);
@@ -335,7 +365,7 @@ public class DialogueWidgetManager
 			return null;
 		}
 
-		// ---- Capture + blank the title (dynamic child 0) ----
+		// ---- Capture + camouflage the title (dynamic child 0) ----
 		Widget titleWidget = dynChildren[0];
 		cachedOptionTitleWidget = titleWidget; // preserve ref for reBlankWidgets()
 		String titleRaw = titleWidget.getText();
@@ -343,9 +373,9 @@ public class DialogueWidgetManager
 		{
 			cachedOptionTitle = stripTags(titleRaw);
 		}
-		blankWidget(titleWidget);
+		camouflageWidget(titleWidget);
 
-		// ---- Capture + blank each option (dynamic children 1..n) ----
+		// ---- Capture + camouflage each option (dynamic children 1..n) ----
 		List<String> freshTexts  = new ArrayList<>();
 		List<Widget> liveWidgets = new ArrayList<>();
 
@@ -366,7 +396,7 @@ public class DialogueWidgetManager
 				freshTexts.add(stripTags(optText));
 			}
 
-			blankWidget(opt);
+			camouflageWidget(opt);
 		}
 
 		if (!freshTexts.isEmpty())
@@ -468,7 +498,7 @@ public class DialogueWidgetManager
 	}
 
 	// -------------------------------------------------------------------------
-	// Widget blanking
+	// Widget blanking / camouflage
 	// -------------------------------------------------------------------------
 
 
@@ -493,6 +523,27 @@ public class DialogueWidgetManager
 			savedTexts.put(widget, current);
 		}
 		widget.setText("");
+	}
+
+	/**
+	 * Camouflages an option widget by setting its text colour to the parchment
+	 * background colour ({@link #OPTION_CAMOUFLAGE_COLOR}) rather than blanking
+	 * its text.  This keeps the text content intact so the engine's 1–5 key
+	 * handler can still read it, while making it visually invisible.
+	 * The original colour is saved on the first call so it can be restored on
+	 * shutdown.
+	 */
+	private void camouflageWidget(Widget widget)
+	{
+		if (widget == null)
+		{
+			return;
+		}
+		if (!savedColors.containsKey(widget))
+		{
+			savedColors.put(widget, widget.getTextColor());
+		}
+		widget.setTextColor(OPTION_CAMOUFLAGE_COLOR);
 	}
 
 	// -------------------------------------------------------------------------

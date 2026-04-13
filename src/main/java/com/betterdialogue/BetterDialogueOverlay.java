@@ -71,6 +71,13 @@ public class BetterDialogueOverlay extends Overlay
 	 */
 	private static final Color NAME_COLOR = new Color(0x00, 0x00, 0x80);
 
+	/**
+	 * Parchment background colour for the option dialogue fill rect.
+	 * Must match {@link DialogueWidgetManager#OPTION_CAMOUFLAGE_COLOR} so
+	 * camouflaged ghost text is fully hidden under the fill.
+	 */
+	private static final Color OPTION_BG = new Color(0xD6, 0xCC, 0xAF);
+
 	/** Vertical padding between the widget top and the first text baseline. */
 	private static final int V_PADDING = 4;
 
@@ -235,13 +242,17 @@ public class BetterDialogueOverlay extends Overlay
 			return;
 		}
 
-		// Fill the entire options container in one pass so there are no gaps
-		// between rows where the original 16 px bitmap text can peek through.
 		Rectangle containerBounds = container.getBounds();
 		if (containerBounds == null || containerBounds.width <= 0)
 		{
 			return;
 		}
+
+		// Option text is camouflaged (not blanked) so the engine key handler
+		// (1–5) can still read it.  We must fill the container with the same
+		// parchment colour to cover the ghost text before painting our own.
+		g.setColor(OPTION_BG);
+		g.fillRect(containerBounds.x, containerBounds.y, containerBounds.width, containerBounds.height);
 
 		// Use the smaller option font — each row is only 16 px tall
 		Font optionFont = fontRenderer.getOptionFont();
@@ -341,15 +352,34 @@ public class BetterDialogueOverlay extends Overlay
 	 */
 	private void reBlankWidgets(DialogueState state)
 	{
+		// The container widget for option dialogue has no text — safeBlank is a no-op.
 		safeBlank(state.getTextWidget());
-		safeBlank(state.getNameWidget());
 
-		Widget[] optWidgets = state.getOptionWidgets();
-		if (optWidgets != null)
+		if (state.getType() == DialogueType.OPTION_DIALOGUE)
 		{
-			for (Widget opt : optWidgets)
+			// Option widgets are camouflaged (text preserved) so the engine
+			// key handler (1–5) can still read their content.
+			// Re-apply the camouflage colour each frame in case the engine resets it.
+			safeCamouflage(state.getNameWidget());
+			Widget[] optWidgets = state.getOptionWidgets();
+			if (optWidgets != null)
 			{
-				safeBlank(opt);
+				for (Widget opt : optWidgets)
+				{
+					safeCamouflage(opt);
+				}
+			}
+		}
+		else
+		{
+			safeBlank(state.getNameWidget());
+			Widget[] optWidgets = state.getOptionWidgets();
+			if (optWidgets != null)
+			{
+				for (Widget opt : optWidgets)
+				{
+					safeBlank(opt);
+				}
 			}
 		}
 	}
@@ -366,6 +396,19 @@ public class BetterDialogueOverlay extends Overlay
 		{
 			widget.setText("");
 		}
+	}
+
+	/**
+	 * Re-applies the camouflage colour to an option widget every frame.
+	 * Text content is intentionally preserved — only the colour is changed.
+	 */
+	private static void safeCamouflage(Widget widget)
+	{
+		if (widget == null)
+		{
+			return;
+		}
+		widget.setTextColor(DialogueWidgetManager.OPTION_CAMOUFLAGE_COLOR);
 	}
 }
 

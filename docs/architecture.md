@@ -69,10 +69,11 @@ BetterDialogueOverlay.render(Graphics2D)  (called every rendered frame)
   ├─ fontRenderer.applyRenderingHints()
   └─ switch(state.getType())  [each case also guarded by its config toggle]
        ├─ NPC / Player  → drawCenteredString() for name (dark blue, NAME_COLOR)
-       │                  + drawWrappedText() for body
-       ├─ Options       → per-option drawCenteredString()
+       │                  + drawWrappedText() for body (no fillRect — native parchment shows through)
+       ├─ Options       → fillRect (OPTION_BG = #D6CCAF, covers camouflaged ghost text)
+       │                  + drawCenteredString() for title + per-option drawCenteredString()
        │                  + hover colour detection via mouse position
-       └─ Sprite        → drawWrappedText()
+       └─ Sprite        → drawWrappedText() (no fillRect)
 ```
 
 ### Config toggles gate detection, not just rendering
@@ -147,14 +148,14 @@ Three options were considered:
 
 | Option | Approach | Risk |
 |--------|----------|------|
-| **A (implemented)** | `widget.setText("")` on text children only; no background fill | Minimal — click handlers are bound to widget bounds, not text content; native parchment shows through cleanly |
+| **A (implemented — NPC/player/sprite)** | `widget.setText("")` on text children only; no background fill | Minimal — click handlers are bound to widget bounds, not text content; native parchment shows through cleanly |
+| **A2 (implemented — options)** | `widget.setTextColor(0xD6CCAF)` to camouflage text; `fillRect` in overlay to cover ghost text | Preserves text content so the engine's 1–5 key handler works; fill colour must match camouflage colour |
 | B | Paint opaque background over text, leave widget untouched | Hard to colour-match the parchment gradient exactly |
 | C | `widget.setHidden(true)` | Breaks click-to-continue and option selection |
 
-**Option A** is used: widget text is blanked so the engine cannot render it.
-No filled rectangle is painted — the game's native parchment texture remains
-visible underneath the replacement text. Original text is restored via
-`DialogueWidgetManager.restoreAll()` when the plugin shuts down.
+**Option A** is used for NPC, player, and sprite dialogue: widget text is blanked so the engine cannot render it; the game's native parchment texture shows through.
+
+**Option A2** is used for option dialogue: widget text colour is set to the parchment colour (`#D6CCAF`) rather than blanking the text. The engine's key handler reads widget text content (not colour), so 1–5 keyboard selection continues to work. The overlay fills the container with the same parchment colour before painting replacement text to hide the ghost text underneath. Original text colours are restored via `DialogueWidgetManager.restoreAll()` on shutdown.
 
 ---
 
@@ -235,6 +236,7 @@ handles:
 |---|----------|-------------------|
 | 1 | **Click-to-continue** — continue prompt is a separate child widget; we blank its text | Click handler is widget-bounds-based; continues to work correctly |
 | 2 | **Option hover highlights** — game normally changes text colour on hover | Overlay detects mouse position vs option bounds and renders white text on hover |
+| 2a | **1–5 key shortcuts in option menus** — engine reads widget text content to map keypresses | Option widgets are camouflaged (`setTextColor(0xD6CCAF)`) not blanked, preserving text content for the key handler |
 | 3 | **Scrolling quest dialogue** — widget text updates each scroll | Re-captured each `onClientTick` via the non-empty check |
 | 4 | **Widget child index drift** — game updates can change child indices | All indices are constants in `DialogueWidgetManager`; verify with Widget Inspector after updates |
 | 5 | **Alternative interface styles** | No background fill is painted so the native parchment/texture always shows through; name/title colours are hardcoded vanilla values (`NAME_COLOR = 0x000080`, `OPTION_TITLE_COLOR = 0x800000`) |
