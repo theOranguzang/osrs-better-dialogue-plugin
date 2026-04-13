@@ -64,10 +64,10 @@ import java.util.regex.Pattern;
  *
  * <table>
  *   <tr><th>Type</th><th>InterfaceID</th><th>Name</th><th>Text</th><th>Continue</th></tr>
- *   <tr><td>NPC</td><td>DIALOG_NPC (231)</td><td>4</td><td>6</td><td>5</td></tr>
- *   <tr><td>Player</td><td>DIALOG_PLAYER (217)</td><td>4</td><td>6</td><td>5</td></tr>
- *   <tr><td>Options</td><td>DIALOG_OPTION (219)</td><td>1 (title)</td><td>2–6</td><td>—</td></tr>
- *   <tr><td>Sprite</td><td>DIALOG_SPRITE (193)</td><td>—</td><td>2</td><td>3</td></tr>
+ *   <tr><td>NPC</td><td>DIALOG_NPC (231)</td><td>static 4</td><td>static 6</td><td>static 5</td></tr>
+ *   <tr><td>Player</td><td>DIALOG_PLAYER (217)</td><td>static 4</td><td>static 6</td><td>static 5</td></tr>
+ *   <tr><td>Options</td><td>DIALOG_OPTION (219)</td><td>dyn[0] of static 1</td><td>dyn[1..n] of static 1</td><td>—</td></tr>
+ *   <tr><td>Sprite</td><td>DIALOG_SPRITE (193)</td><td>—</td><td>static 2</td><td>dyn[2] of static 0</td></tr>
  * </table>
  */
 @Slf4j
@@ -101,8 +101,13 @@ public class DialogueWidgetManager
 	//   Dynamic[1..n] = clickable option rows  (HasListener=true)
 	// NOTE: there are NO useful static child constants here — access is via getDynamicChildren().
 
-	private static final int SPRITE_CHILD_TEXT     = 2;
-	private static final int SPRITE_CHILD_CONTINUE = 3;
+	// Sprite dialogue (InterfaceID.DIALOG_SPRITE = 193)
+	//   S 193.1  Objectbox.ITEM  — item/skill sprite (static child 1)
+	//   S 193.2  Objectbox.TEXT  — body text         (static child 2)
+	//   N 193.0  Objectbox.UNIVERSE — container (nested)
+	//     D 193.0[2]  "Click here to continue"  — DYNAMIC child 2 of 193.0 (HasListener=true)
+	private static final int SPRITE_CHILD_TEXT          = 2; // static child of 193
+	private static final int SPRITE_CONTINUE_DYN_INDEX  = 2; // dynamic child of 193.0
 
 	// -------------------------------------------------------------------------
 	// Tag parsing
@@ -458,8 +463,20 @@ public class DialogueWidgetManager
 
 	private DialogueState buildSpriteState()
 	{
-		Widget textWidget     = client.getWidget(InterfaceID.DIALOG_SPRITE, SPRITE_CHILD_TEXT);
-		Widget continueWidget = client.getWidget(InterfaceID.DIALOG_SPRITE, SPRITE_CHILD_CONTINUE);
+		Widget spriteRoot = client.getWidget(InterfaceID.DIALOG_SPRITE, 0);
+		Widget textWidget  = client.getWidget(InterfaceID.DIALOG_SPRITE, SPRITE_CHILD_TEXT);
+
+		// Continue widget is a DYNAMIC child of the 193.0 container, not a static child.
+		// Confirmed via Widget Inspector: D 193.0[2], HasListener=true, Text="Click here to continue"
+		Widget continueWidget = null;
+		if (spriteRoot != null)
+		{
+			Widget[] dynChildren = spriteRoot.getDynamicChildren();
+			if (dynChildren != null && dynChildren.length > SPRITE_CONTINUE_DYN_INDEX)
+			{
+				continueWidget = dynChildren[SPRITE_CONTINUE_DYN_INDEX];
+			}
+		}
 
 		if (textWidget == null)
 		{
@@ -506,6 +523,7 @@ public class DialogueWidgetManager
 	// -------------------------------------------------------------------------
 	// Cache management
 	// -------------------------------------------------------------------------
+
 
 	private void clearCacheFor(DialogueType type)
 	{

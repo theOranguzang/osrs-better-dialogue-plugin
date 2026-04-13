@@ -348,10 +348,12 @@ public class BetterDialogueOverlay extends Overlay
 			return;
 		}
 		Widget continueWidget = state.getContinueWidget();
-		if (continueWidget == null || continueWidget.isHidden())
+		if (continueWidget == null)
 		{
 			return;
 		}
+		// Don't check isHidden() — a hidden widget has zero/null bounds anyway,
+		// and some sprite dialogue sub-types report isHidden=true incorrectly.
 		Rectangle cb = continueWidget.getBounds();
 		if (cb == null || cb.width <= 0)
 		{
