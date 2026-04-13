@@ -71,13 +71,6 @@ public class BetterDialogueOverlay extends Overlay
 	 */
 	private static final Color NAME_COLOR = new Color(0x00, 0x00, 0x80);
 
-	/**
-	 * Parchment background colour for the option dialogue fill rect.
-	 * Must match {@link DialogueWidgetManager#OPTION_CAMOUFLAGE_COLOR} so
-	 * camouflaged ghost text is fully hidden under the fill.
-	 */
-	private static final Color OPTION_BG = new Color(0xD6, 0xCC, 0xAF);
-
 	/** Vertical padding between the widget top and the first text baseline. */
 	private static final int V_PADDING = 4;
 
@@ -248,11 +241,9 @@ public class BetterDialogueOverlay extends Overlay
 			return;
 		}
 
-		// Option text is camouflaged (not blanked) so the engine key handler
-		// (1–5) can still read it.  We must fill the container with the same
-		// parchment colour to cover the ghost text before painting our own.
-		g.setColor(OPTION_BG);
-		g.fillRect(containerBounds.x, containerBounds.y, containerBounds.width, containerBounds.height);
+		// No fillRect — option text is camouflaged to the parchment colour so the
+		// engine key handler (1–5) can still read it.  The overlay text paints on
+		// top; ghost text in parchment-on-parchment is nearly invisible underneath.
 
 		// Use the smaller option font — each row is only 16 px tall
 		Font optionFont = fontRenderer.getOptionFont();

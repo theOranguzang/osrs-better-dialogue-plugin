@@ -70,8 +70,8 @@ BetterDialogueOverlay.render(Graphics2D)  (called every rendered frame)
   └─ switch(state.getType())  [each case also guarded by its config toggle]
        ├─ NPC / Player  → drawCenteredString() for name (dark blue, NAME_COLOR)
        │                  + drawWrappedText() for body (no fillRect — native parchment shows through)
-       ├─ Options       → fillRect (OPTION_BG = #D6CCAF, covers camouflaged ghost text)
-       │                  + drawCenteredString() for title + per-option drawCenteredString()
+       ├─ Options       → per-option drawCenteredString() (no fillRect — camouflaged ghost
+       │                  text is parchment-on-parchment, overlay text covers it directly)
        │                  + hover colour detection via mouse position
        └─ Sprite        → drawWrappedText() (no fillRect)
 ```
@@ -149,13 +149,13 @@ Three options were considered:
 | Option | Approach | Risk |
 |--------|----------|------|
 | **A (implemented — NPC/player/sprite)** | `widget.setText("")` on text children only; no background fill | Minimal — click handlers are bound to widget bounds, not text content; native parchment shows through cleanly |
-| **A2 (implemented — options)** | `widget.setTextColor(0xD6CCAF)` to camouflage text; `fillRect` in overlay to cover ghost text | Preserves text content so the engine's 1–5 key handler works; fill colour must match camouflage colour |
+| **A2 (implemented — options)** | `widget.setTextColor(0xD6CCAF)` to camouflage text against parchment; no fillRect | Preserves text content so the engine's 1–5 key handler works; ghost text is parchment-on-parchment (near-invisible); overlay text paints on top |
 | B | Paint opaque background over text, leave widget untouched | Hard to colour-match the parchment gradient exactly |
 | C | `widget.setHidden(true)` | Breaks click-to-continue and option selection |
 
 **Option A** is used for NPC, player, and sprite dialogue: widget text is blanked so the engine cannot render it; the game's native parchment texture shows through.
 
-**Option A2** is used for option dialogue: widget text colour is set to the parchment colour (`#D6CCAF`) rather than blanking the text. The engine's key handler reads widget text content (not colour), so 1–5 keyboard selection continues to work. The overlay fills the container with the same parchment colour before painting replacement text to hide the ghost text underneath. Original text colours are restored via `DialogueWidgetManager.restoreAll()` on shutdown.
+**Option A2** is used for option dialogue: widget text colour is set to the parchment colour (`#D6CCAF`) rather than blanking the text. The engine's key handler reads widget text content (not colour), so 1–5 keyboard selection continues to work. No fillRect is needed — ghost text rendered in parchment-on-parchment is nearly invisible, and the overlay's replacement text paints directly on top. Original text colours are restored via `DialogueWidgetManager.restoreAll()` on shutdown.
 
 ---
 
