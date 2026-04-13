@@ -106,8 +106,8 @@ public class DialogueWidgetManager
 	//   S 193.2  Objectbox.TEXT  — body text         (static child 2)
 	//   N 193.0  Objectbox.UNIVERSE — container (nested)
 	//     D 193.0[2]  "Click here to continue"  — DYNAMIC child 2 of 193.0 (HasListener=true)
-	private static final int SPRITE_CHILD_TEXT          = 2; // static child of 193
-	private static final int SPRITE_CONTINUE_DYN_INDEX  = 2; // dynamic child of 193.0
+	private static final int SPRITE_CHILD_TEXT         = 2; // static child of 193
+	static final int          SPRITE_CONTINUE_DYN_INDEX = 2; // dynamic child of 193.0
 
 	// -------------------------------------------------------------------------
 	// Tag parsing
@@ -500,7 +500,7 @@ public class DialogueWidgetManager
 		}
 
 		blankWidget(textWidget);
-		camouflageWidget(continueWidget); // setTextColor, not setText("") — engine needs text for spacebar
+		blankWidget(continueWidget); // setText("") — sprite dialogues don't rely on spacebar
 
 		if (cachedSpriteBody.isEmpty())
 		{
@@ -616,7 +616,12 @@ public class DialogueWidgetManager
 		return w != null && !w.isHidden();
 	}
 
-	private static String stripTags(String text)
+	/**
+	 * Strips all inline markup tags ({@code <tag>}) from a raw widget text string.
+	 * Package-private so {@link BetterDialogueOverlay} can strip live widget text
+	 * captured during render().
+	 */
+	static String stripTags(String text)
 	{
 		if (text == null)
 		{

@@ -71,6 +71,15 @@ public class BetterDialogueOverlay extends Overlay
 	 */
 	private static final Color NAME_COLOR = new Color(0x00, 0x00, 0x80);
 
+	/**
+	 * Parchment background colour of the OSRS dialogue box.
+	 * Used to fill the continue-widget area before painting our replacement text,
+	 * overwriting any white "Please wait..." the engine rendered that frame
+	 * (which cannot be prevented due to widget rendering running before overlays).
+	 * Value confirmed via Widget Inspector: {@code #D6CCAF}.
+	 */
+	private static final Color PARCHMENT_COLOR = new Color(0xD6, 0xCC, 0xAF);
+
 	/** Vertical padding between the widget top and the first text baseline. */
 	private static final int V_PADDING = 4;
 
@@ -195,7 +204,8 @@ public class BetterDialogueOverlay extends Overlay
 		fontRenderer.drawWrappedText(g, state.getBodySegments(), bounds, bounds.y + V_PADDING);
 
 		// ---- Continue ("Click here to continue" / "Please wait...") ----
-		renderContinueText(g, state);
+		// Pass the live static-child widget directly — static children are always the same object.
+		renderContinueText(g, state.getContinueWidget(), state.getContinueText());
 	}
 
 	private void renderPlayerDialogue(Graphics2D g, DialogueState state)
@@ -230,7 +240,7 @@ public class BetterDialogueOverlay extends Overlay
 		fontRenderer.drawWrappedText(g, state.getBodySegments(), bounds, bounds.y + V_PADDING);
 
 		// ---- Continue ----
-		renderContinueText(g, state);
+		renderContinueText(g, state.getContinueWidget(), state.getContinueText());
 	}
 
 	private void renderOptionDialogue(Graphics2D g, DialogueState state)
@@ -331,35 +341,77 @@ public class BetterDialogueOverlay extends Overlay
 		fontRenderer.drawWrappedText(g, state.getBodySegments(), bounds, bounds.y + V_PADDING);
 
 		// ---- Continue ----
-		renderContinueText(g, state);
+		// Re-fetch the live dynamic child every frame — the engine may create a new Widget
+		// object when it writes "Please wait...", making the stale state reference stale.
+		// Double-blank here (render-time) in addition to the tick-handler blank so the new
+		// object is guaranteed empty before the engine renders it this frame.
+		Widget spriteRoot = client.getWidget(net.runelite.api.widgets.InterfaceID.DIALOG_SPRITE, 0);
+		Widget liveContinue = null;
+		if (spriteRoot != null)
+		{
+			Widget[] dyn = spriteRoot.getDynamicChildren();
+			if (dyn != null && dyn.length > DialogueWidgetManager.SPRITE_CONTINUE_DYN_INDEX)
+			{
+				liveContinue = dyn[DialogueWidgetManager.SPRITE_CONTINUE_DYN_INDEX];
+			}
+		}
+		if (liveContinue != null)
+		{
+			safeBlank(liveContinue); // double-blank: closes the tick→render timing gap
+		}
+		renderContinueText(g, liveContinue != null ? liveContinue : state.getContinueWidget(),
+			state.getContinueText());
 	}
 
 	/**
-	 * Renders the cached "Click here to continue" / "Please wait..." text
-	 * centred within the continue widget's bounds, in dark blue to match vanilla.
-	 * The widget text was blanked by the manager and by {@link #reBlankWidgets};
-	 * this overlay paints our replacement on top using the configured font.
+	 * Renders the continue/wait text centred over {@code widget}.
+	 *
+	 * <p>NPC/player continue widgets are camouflaged (colour set to parchment) by
+	 * {@code reBlankWidgets()} so the engine spacebar handler can still read their text.
+	 * Sprite continue widgets are blanked ({@code setText("")}); sprite dialogues do not
+	 * use spacebar, so blanking is safe and produces no ghost artefacts.
+	 *
+	 * <p>Live widget text is preferred when available (NPC/player — text preserved by
+	 * camouflage); falls back to the tick-handler cache ({@code fallbackText}) when the
+	 * widget is blank (sprite) or when the cache is ahead of the live state.
+	 *
+	 * @param widget       live continue widget; may be {@code null}
+	 * @param fallbackText cached continue text from the last tick; used when widget text is empty
 	 */
-	private void renderContinueText(Graphics2D g, DialogueState state)
+	private void renderContinueText(Graphics2D g, Widget widget, String fallbackText)
 	{
-		String continueText = state.getContinueText();
-		if (continueText == null || continueText.isEmpty())
+		if (widget == null)
 		{
 			return;
 		}
-		Widget continueWidget = state.getContinueWidget();
-		if (continueWidget == null)
+
+		// Prefer fresh live text (still present for NPC/player because camouflage preserves it).
+		// For sprite the text is already blank, so we fall through to the cache.
+		String liveText = widget.getText();
+		String text = (liveText != null && !liveText.isEmpty())
+			? DialogueWidgetManager.stripTags(liveText)
+			: fallbackText;
+
+		if (text == null || text.isEmpty())
 		{
 			return;
 		}
-		// Don't check isHidden() — a hidden widget has zero/null bounds anyway,
-		// and some sprite dialogue sub-types report isHidden=true incorrectly.
-		Rectangle cb = continueWidget.getBounds();
+
+		Rectangle cb = widget.getBounds();
 		if (cb == null || cb.width <= 0)
 		{
 			return;
 		}
-		fontRenderer.drawCenteredString(g, continueText, cb, centreY(g, cb, fontRenderer.getFont()), NAME_COLOR);
+
+		Font font = fontRenderer.getFont();
+		g.setFont(font);
+		FontMetrics fm = g.getFontMetrics(font);
+
+		int textX = cb.x + (cb.width  - fm.stringWidth(text)) / 2;
+		int textY = cb.y + (cb.height - fm.getHeight())        / 2;
+
+		g.setColor(NAME_COLOR);
+		g.drawString(text, textX, textY + fm.getAscent());
 	}
 
 	// -------------------------------------------------------------------------
@@ -401,7 +453,15 @@ public class BetterDialogueOverlay extends Overlay
 		else
 		{
 			safeBlank(state.getNameWidget());
-			safeCamouflage(state.getContinueWidget()); // camouflage, not blank — engine needs text for spacebar
+			// Sprite continue is blanked (setText); NPC/player continue is camouflaged so spacebar still fires.
+			if (state.getType() == DialogueType.SPRITE_DIALOGUE)
+			{
+				safeBlank(state.getContinueWidget());
+			}
+			else
+			{
+				safeCamouflage(state.getContinueWidget());
+			}
 			Widget[] optWidgets = state.getOptionWidgets();
 			if (optWidgets != null)
 			{
