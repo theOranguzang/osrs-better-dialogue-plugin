@@ -63,10 +63,12 @@ BetterDialogueOverlay.render(Graphics2D)  (called every rendered frame)
   ├─ reBlankWidgets(state)   ← belt-and-suspenders blank before any pixels written
   ├─ fontRenderer.applyRenderingHints()
   └─ switch(state.getType())  [each case also guarded by its config toggle]
-      ├─ NPC / Player  → fillBackground() + drawWrappedText()
-      ├─ Options       → per-option fillBackground() + drawCenteredString()
-      │                  + hover colour detection via mouse position
-      └─ Sprite        → fillBackground() + drawWrappedText()
+       ├─ NPC / Player  → fillBackground() (body + name widgets)
+       │                  + drawCenteredString() for name (dark blue, NAME_COLOR)
+       │                  + drawWrappedText() for body
+       ├─ Options       → per-option fillBackground() + drawCenteredString()
+       │                  + hover colour detection via mouse position
+       └─ Sprite        → fillBackground() + drawWrappedText()
 ```
 
 ### Config toggles gate detection, not just rendering
@@ -113,11 +115,13 @@ String raw = textWidget.getText();
 if (raw != null && !raw.isEmpty()) {
     // Only update the cache when the engine gives us real text
     cachedNpcBody = parseSegments(raw, Color.BLACK);
+    cachedNpcName = nameWidget != null ? stripTags(nameWidget.getText()) : "";
 }
-// Always blank — even on frames where raw was already ""
+// Always blank BOTH the text and name widgets every frame
 blankWidget(textWidget);
+blankWidget(nameWidget);
 // Always build the state from the cache, not the (now empty) widget
-return new DialogueState(..., cachedNpcBody, ...);
+return new DialogueState(..., cachedNpcName, cachedNpcBody, ...);
 ```
 
 The cache is populated **only when `getText()` returns non-empty text**. On
@@ -229,6 +233,6 @@ handles:
 | 2 | **Option hover highlights** — game normally changes text colour on hover | Overlay detects mouse position vs option bounds and renders white text on hover |
 | 3 | **Scrolling quest dialogue** — widget text updates each scroll | Re-captured each `onClientTick` via the non-empty check |
 | 4 | **Widget child index drift** — game updates can change child indices | All indices are constants in `DialogueWidgetManager`; verify with Widget Inspector after updates |
-| 5 | **Alternative interface styles** | Background fill colour (`#C9B89A`) may not match; exposed as a future config option |
+| 5 | **Alternative interface styles** | Background fill colour (`#C9B89A`) may not match; name/title colours are hardcoded vanilla values (`NAME_COLOR = 0x000080` dark blue, `OPTION_TITLE_COLOR = 0x800000` dark red); all exposed as future config options |
 | 6 | **GPU plugin** | Overlay paints in screen-space; should be unaffected. Verify layering in production. |
 

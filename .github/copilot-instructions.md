@@ -31,8 +31,8 @@ All plugin source lives in `src/main/java/com/betterdialogue/`.
 |------|------|
 | [`BetterDialoguePlugin.java`](src/main/java/com/betterdialogue/BetterDialoguePlugin.java) | Main plugin class. Registers/removes the overlay, subscribes to `ClientTick`, calls `DialogueWidgetManager` each frame, provides config via Guice. |
 | [`BetterDialogueConfig.java`](src/main/java/com/betterdialogue/BetterDialogueConfig.java) | RuneLite config interface. Font family (5 Java logical fonts), font size (10–24), bold toggle, anti-aliasing toggle, and four per-type enable toggles grouped under a `@ConfigSection`. No color pickers or custom file paths. |
-| [`BetterDialogueOverlay.java`](src/main/java/com/betterdialogue/BetterDialogueOverlay.java) | `OverlayLayer.ABOVE_WIDGETS` overlay. Re-blanks widgets in-frame, fills background rect, delegates text rendering to `FontRenderer`. Vanilla colors are hardcoded constants (no config). |
-| [`DialogueWidgetManager.java`](src/main/java/com/betterdialogue/DialogueWidgetManager.java) | Detects active dialogue each tick (gated on per-type config toggles), implements the **capture-then-blank** text cache pattern, parses `<col>`/`<br>` tags, restores widget text on shutdown. |
+| [`BetterDialogueOverlay.java`](src/main/java/com/betterdialogue/BetterDialogueOverlay.java) | `OverlayLayer.ABOVE_WIDGETS` overlay. Re-blanks widgets in-frame, fills background rect, renders NPC/player name in dark blue (`NAME_COLOR = 0x000080`) above the body text, delegates body text rendering to `FontRenderer`. Vanilla colors are hardcoded constants (no config). |
+| [`DialogueWidgetManager.java`](src/main/java/com/betterdialogue/DialogueWidgetManager.java) | Detects active dialogue each tick (gated on per-type config toggles), implements the **capture-then-blank** text cache pattern for both name and body widgets, parses `<col>`/`<br>` tags, restores widget text on shutdown. |
 | [`FontRenderer.java`](src/main/java/com/betterdialogue/FontRenderer.java) | Creates fonts from Java logical names (`new Font(javaName, style, size)`), caches by `"family_size_bold"` key, applies rendering hints, word-wraps via `FontMetrics`, draws centred lines. No TTF file loading. |
 | [`DialogueState.java`](src/main/java/com/betterdialogue/DialogueState.java) | Immutable per-frame snapshot: dialogue type, cached text segments, option strings, live widget references for bounds. |
 | [`DialogueType.java`](src/main/java/com/betterdialogue/DialogueType.java) | Enum of supported dialogue types: `NPC_DIALOGUE`, `PLAYER_DIALOGUE`, `OPTION_DIALOGUE`, `SPRITE_DIALOGUE`, `LEVEL_UP`, `QUEST_COMPLETE`. |
@@ -53,9 +53,9 @@ Test runner: [`src/test/java/com/betterdialogue/BetterDialoguePluginTest.java`](
 the live widget. See [`docs/architecture.md`](docs/architecture.md#the-capture-then-blank-pattern).
 
 ```
-getText() non-empty  →  update cache  →  blank widget
-getText() empty      →  leave cache   →  blank widget (no-op)
-render()             →  read cache    →  paint
+getText() non-empty  →  update cache (body + name)  →  blank widget (text + name)
+getText() empty      →  leave cache                 →  blank widget (no-op)
+render()             →  read cache                  →  paint name then body
 ```
 
 ### 2. `ClientTick` not `GameTick`

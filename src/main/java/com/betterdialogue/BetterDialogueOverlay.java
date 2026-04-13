@@ -77,6 +77,12 @@ public class BetterDialogueOverlay extends Overlay
 	 */
 	private static final Color OPTION_TITLE_COLOR = new Color(0x80, 0x00, 0x00);
 
+	/**
+	 * Colour used to render the NPC/player name above the body text.
+	 * Matches vanilla OSRS: Widget Inspector reports TextColor = 0x000080 (dark blue).
+	 */
+	private static final Color NAME_COLOR = new Color(0x00, 0x00, 0x80);
+
 	/** Vertical padding between the widget top and the first text baseline. */
 	private static final int V_PADDING = 4;
 
@@ -184,6 +190,23 @@ public class BetterDialogueOverlay extends Overlay
 		}
 
 		fillBackground(g, bounds);
+
+		// ---- Name ----
+		Widget nameWidget = state.getNameWidget();
+		if (nameWidget != null && !nameWidget.isHidden() && state.getNpcName() != null && !state.getNpcName().isEmpty())
+		{
+			Rectangle nameBounds = nameWidget.getBounds();
+			if (nameBounds != null && nameBounds.width > 0)
+			{
+				fillBackground(g, nameBounds);
+				fontRenderer.drawCenteredString(
+					g, state.getNpcName(), nameBounds,
+					centreY(g, nameBounds, fontRenderer.getFont()),
+					NAME_COLOR);
+			}
+		}
+
+		// ---- Body ----
 		fontRenderer.drawWrappedText(g, state.getBodySegments(), bounds, bounds.y + V_PADDING);
 	}
 
@@ -202,6 +225,23 @@ public class BetterDialogueOverlay extends Overlay
 		}
 
 		fillBackground(g, bounds);
+
+		// ---- Name ----
+		Widget nameWidget = state.getNameWidget();
+		if (nameWidget != null && !nameWidget.isHidden() && state.getNpcName() != null && !state.getNpcName().isEmpty())
+		{
+			Rectangle nameBounds = nameWidget.getBounds();
+			if (nameBounds != null && nameBounds.width > 0)
+			{
+				fillBackground(g, nameBounds);
+				fontRenderer.drawCenteredString(
+					g, state.getNpcName(), nameBounds,
+					centreY(g, nameBounds, fontRenderer.getFont()),
+					NAME_COLOR);
+			}
+		}
+
+		// ---- Body ----
 		fontRenderer.drawWrappedText(g, state.getBodySegments(), bounds, bounds.y + V_PADDING);
 	}
 

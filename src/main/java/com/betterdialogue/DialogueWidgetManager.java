@@ -257,6 +257,7 @@ public class DialogueWidgetManager
 
 		// ---- Blank: always, every frame ----
 		blankWidget(textWidget);
+		blankWidget(nameWidget);
 
 		// If we've never seen any text yet, nothing to render
 		if (cachedNpcBody.isEmpty())
@@ -296,6 +297,7 @@ public class DialogueWidgetManager
 		}
 
 		blankWidget(textWidget);
+		blankWidget(nameWidget);
 
 		if (cachedPlayerBody.isEmpty())
 		{
