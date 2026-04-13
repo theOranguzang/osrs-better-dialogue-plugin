@@ -49,28 +49,16 @@ import java.util.List;
  * <p>The overlay runs on {@link OverlayLayer#ABOVE_WIDGETS} so it is drawn
  * after all widget rendering, ensuring our text is always on top. It reads
  * the {@link DialogueState} snapshot set by {@link BetterDialoguePlugin} each
- * game tick and then:
- * <ol>
- *   <li>Fills the text widget's bounds with the dialogue background colour to
- *       cover any residual engine-rendered text.</li>
- *   <li>Draws word-wrapped, colour-tagged replacement text using the
- *       configured TrueType font via {@link FontRenderer}.</li>
- * </ol>
+ * game tick and draws word-wrapped, colour-tagged replacement text using the
+ * configured system font via {@link FontRenderer}.
  *
- * <h3>Background colour</h3>
- * The parchment / tan colour ({@code #C9B89A}) is a close match for the default
- * OSRS dialogue box background. Players using an alternative interface style
- * may need to adjust this; a future config option could expose it.
+ * <p>No background fill is painted — {@code setText("")} already blanks the
+ * original bitmap text, so the game's native parchment texture shows through
+ * naturally underneath the replacement text.
  */
 @Singleton
 public class BetterDialogueOverlay extends Overlay
 {
-	/**
-	 * Approximate OSRS dialogue-box background colour.
-	 * Used to paint over the original engine-rendered text before we draw our own.
-	 */
-	private static final Color DIALOGUE_BG = new Color(0xC9, 0xB8, 0x9A, 255);
-
 	/**
 	 * Colour of the "Select an option" title in the option dialogue.
 	 * Confirmed via Widget Inspector: TextColor = 0x800000 (dark red).
@@ -189,8 +177,6 @@ public class BetterDialogueOverlay extends Overlay
 			return;
 		}
 
-		fillBackground(g, bounds);
-
 		// ---- Name ----
 		Widget nameWidget = state.getNameWidget();
 		if (nameWidget != null && !nameWidget.isHidden() && state.getNpcName() != null && !state.getNpcName().isEmpty())
@@ -198,7 +184,6 @@ public class BetterDialogueOverlay extends Overlay
 			Rectangle nameBounds = nameWidget.getBounds();
 			if (nameBounds != null && nameBounds.width > 0)
 			{
-				fillBackground(g, nameBounds);
 				fontRenderer.drawCenteredString(
 					g, state.getNpcName(), nameBounds,
 					centreY(g, nameBounds, fontRenderer.getFont()),
@@ -224,8 +209,6 @@ public class BetterDialogueOverlay extends Overlay
 			return;
 		}
 
-		fillBackground(g, bounds);
-
 		// ---- Name ----
 		Widget nameWidget = state.getNameWidget();
 		if (nameWidget != null && !nameWidget.isHidden() && state.getNpcName() != null && !state.getNpcName().isEmpty())
@@ -233,7 +216,6 @@ public class BetterDialogueOverlay extends Overlay
 			Rectangle nameBounds = nameWidget.getBounds();
 			if (nameBounds != null && nameBounds.width > 0)
 			{
-				fillBackground(g, nameBounds);
 				fontRenderer.drawCenteredString(
 					g, state.getNpcName(), nameBounds,
 					centreY(g, nameBounds, fontRenderer.getFont()),
@@ -260,7 +242,6 @@ public class BetterDialogueOverlay extends Overlay
 		{
 			return;
 		}
-		fillBackground(g, containerBounds);
 
 		// Use the smaller option font — each row is only 16 px tall
 		Font optionFont = fontRenderer.getOptionFont();
@@ -339,7 +320,6 @@ public class BetterDialogueOverlay extends Overlay
 			return;
 		}
 
-		fillBackground(g, bounds);
 		fontRenderer.drawWrappedText(g, state.getBodySegments(), bounds, bounds.y + V_PADDING);
 	}
 
@@ -386,13 +366,6 @@ public class BetterDialogueOverlay extends Overlay
 		{
 			widget.setText("");
 		}
-	}
-
-	/** Fills the text area with the dialogue background colour to cover engine text. */
-	private void fillBackground(Graphics2D g, Rectangle bounds)
-	{
-		g.setColor(DIALOGUE_BG);
-		g.fillRect(bounds.x, bounds.y, bounds.width, bounds.height);
 	}
 }
 

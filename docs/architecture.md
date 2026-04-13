@@ -28,16 +28,21 @@ provides a full `Graphics2D` context drawn after the engine finishes a frame.
 │      └─ [child 6] body text          │  ← we blank this text
 │                                      │
 │  (engine renders — but widgets       │
-│   now contain empty strings)         │
+│   now contain empty strings,         │
+│   parchment background still drawn)  │
 └──────────────────────────────────────┘
           ↓  frame handed to overlay system
 ┌──────────────────────────────────────┐
 │     BetterDialogueOverlay.render()   │
 │                                      │
-│  1. fill background rect (covers     │
-│     any residual bitmap text)        │
-│  2. drawWrappedText() with           │
-│     configured system font           │
+│  1. drawCenteredString() for name    │
+│     (dark blue, NAME_COLOR)          │
+│  2. drawWrappedText() for body       │
+│     using configured system font     │
+│                                      │
+│  No background fill — the game's     │
+│  native parchment texture shows      │
+│  through naturally.                  │
 └──────────────────────────────────────┘
 ```
 
@@ -63,12 +68,11 @@ BetterDialogueOverlay.render(Graphics2D)  (called every rendered frame)
   ├─ reBlankWidgets(state)   ← belt-and-suspenders blank before any pixels written
   ├─ fontRenderer.applyRenderingHints()
   └─ switch(state.getType())  [each case also guarded by its config toggle]
-       ├─ NPC / Player  → fillBackground() (body + name widgets)
-       │                  + drawCenteredString() for name (dark blue, NAME_COLOR)
+       ├─ NPC / Player  → drawCenteredString() for name (dark blue, NAME_COLOR)
        │                  + drawWrappedText() for body
-       ├─ Options       → per-option fillBackground() + drawCenteredString()
+       ├─ Options       → per-option drawCenteredString()
        │                  + hover colour detection via mouse position
-       └─ Sprite        → fillBackground() + drawWrappedText()
+       └─ Sprite        → drawWrappedText()
 ```
 
 ### Config toggles gate detection, not just rendering
@@ -143,13 +147,13 @@ Three options were considered:
 
 | Option | Approach | Risk |
 |--------|----------|------|
-| **A (implemented)** | `widget.setText("")` on text children only | Minimal — click handlers are bound to widget bounds, not text content |
+| **A (implemented)** | `widget.setText("")` on text children only; no background fill | Minimal — click handlers are bound to widget bounds, not text content; native parchment shows through cleanly |
 | B | Paint opaque background over text, leave widget untouched | Hard to colour-match the parchment gradient exactly |
 | C | `widget.setHidden(true)` | Breaks click-to-continue and option selection |
 
-**Option A + background fill (hybrid)** is used: the widget text is blanked so
-the engine cannot render it, and a filled rectangle is also painted by the
-overlay to catch any residual pixels. Original text is restored via
+**Option A** is used: widget text is blanked so the engine cannot render it.
+No filled rectangle is painted — the game's native parchment texture remains
+visible underneath the replacement text. Original text is restored via
 `DialogueWidgetManager.restoreAll()` when the plugin shuts down.
 
 ---
@@ -233,6 +237,6 @@ handles:
 | 2 | **Option hover highlights** — game normally changes text colour on hover | Overlay detects mouse position vs option bounds and renders white text on hover |
 | 3 | **Scrolling quest dialogue** — widget text updates each scroll | Re-captured each `onClientTick` via the non-empty check |
 | 4 | **Widget child index drift** — game updates can change child indices | All indices are constants in `DialogueWidgetManager`; verify with Widget Inspector after updates |
-| 5 | **Alternative interface styles** | Background fill colour (`#C9B89A`) may not match; name/title colours are hardcoded vanilla values (`NAME_COLOR = 0x000080` dark blue, `OPTION_TITLE_COLOR = 0x800000` dark red); all exposed as future config options |
+| 5 | **Alternative interface styles** | No background fill is painted so the native parchment/texture always shows through; name/title colours are hardcoded vanilla values (`NAME_COLOR = 0x000080`, `OPTION_TITLE_COLOR = 0x800000`) |
 | 6 | **GPU plugin** | Overlay paints in screen-space; should be unaffected. Verify layering in production. |
 
